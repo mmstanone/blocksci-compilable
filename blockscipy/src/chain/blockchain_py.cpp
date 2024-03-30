@@ -112,6 +112,100 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         }
         return pyAddresses;
     }, "Find all addresses beginning with the given prefix", pybind11::arg("prefix"))
+    .def("filter_in_keys", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
+        std::unordered_set<std::string> umap;
+        for (auto item : keys) {
+            std::string key = py::str(item.first).cast<std::string>();
+            umap.insert(key);
+        };
+        std::cout << "Size of keys: " << umap.size() << std::endl;
+
+        return chain[{start, stop}].filter([&umap](const Transaction &tx) {
+            return umap.find(tx.getHash().GetHex()) != umap.end();
+        });
+    }, "Filter the blockchain to only include txes with the given keys", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
+
+
+    .def("find_consolidation_3_hops", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
+        std::unordered_set<std::string> umap;
+        for (auto item : keys) {
+            std::string key = py::str(item.first).cast<std::string>();
+            umap.insert(key);
+        };
+
+        using MapType = std::pair<std::string, std::unordered_map<std::string, int>>;
+        auto reduce_func = [](std::vector<MapType> &vec1, std::vector<MapType> &vec2) -> std::vector<MapType> & {
+                vec1.reserve(vec1.size() + vec2.size());
+                vec1.insert(vec1.end(), std::make_move_iterator(vec2.begin()), std::make_move_iterator(vec2.end()));
+                return vec1;
+            };
+
+        auto map_func = [&umap](const Transaction &tx) -> std::vector<MapType> {
+            if (umap.find(tx.getHash().GetHex()) == umap.end()) {
+                return {};
+            }
+
+            std::unordered_map<std::string, int> found;
+            for (const auto& output : tx.outputs()) {
+                if (!output.isSpent()) continue;
+
+                bool found_match = false;
+
+                if (output.getSpendingTx().value().outputCount() < 2) {
+                    auto output_spent_in = output.getSpendingTx().value().getHash().GetHex();
+                    if (found.find(output_spent_in) == found.end()) {
+                        found[output_spent_in] = 0;
+                    }
+                    found[output_spent_in]++;
+                    continue;
+                }
+
+                for (const auto& output2 : output.getSpendingTx().value().outputs()) {
+                    if (found_match) break;
+                    if (!output2.isSpent()) continue;
+
+                    if (output2.getSpendingTx().value().outputCount() < 2) {
+                        auto output_spent_in = output2.getSpendingTx().value().getHash().GetHex();
+                        if (found.find(output_spent_in) == found.end()) {
+                            found[output_spent_in] = 0;
+                        }
+                        found[output_spent_in]++;
+                        found_match = true;
+                        break;
+                    }
+
+                    for (const auto& output3 : output2.getSpendingTx().value().outputs()) {
+                        if (!output3.isSpent()) continue;
+
+                        if (output3.getSpendingTx().value().outputCount() < 2) {
+                            auto output_spent_in = output3.getSpendingTx().value().getHash().GetHex();
+                            if (found.find(output_spent_in) == found.end()) {
+                                found[output_spent_in] = 0;
+                            }
+                            found[output_spent_in]++;
+                            found_match = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            // remove entries from found where value is less than 2
+            for (auto it = found.begin(); it != found.end(); ) {
+                if (it->second < 2) {
+                    it = found.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+
+            return {{tx.getHash().GetHex(), found}};
+        };
+
+        return chain[{start, stop}].mapReduce<std::vector<MapType>, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);
+
+    }, "Map blockchain to get txes consolidated within 3 hops", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
+
+
     .def("_segment_indexes", [](Blockchain &chain, BlockHeight start, BlockHeight stop, unsigned int cpuCount) {
         auto segments = chain[{start, stop}].segment(cpuCount);
         std::vector<std::pair<BlockHeight, BlockHeight>> ret;
