@@ -15,11 +15,13 @@
 #include <blocksci/chain/access.hpp>
 #include <blocksci/scripts/script_range.hpp>
 #include <blocksci/cluster/cluster.hpp>
+#include "../external/json/single_include/nlohmann/json.hpp"
 
 namespace py = pybind11;
 
 using namespace blocksci;
 
+using json = nlohmann::json;
 template <AddressType::Enum type>
 using PythonScriptRange = Range<ScriptAddress<type>>;
 using PythonScriptRangeVariant = to_variadic_t<to_address_tuple_t<PythonScriptRange>, mpark::variant>;
@@ -112,6 +114,63 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         }
         return pyAddresses;
     }, "Find all addresses beginning with the given prefix", pybind11::arg("prefix"))
+    .def("find_friends_who_dont_pay", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
+        std::unordered_set<std::string> umap;
+        for (auto item : keys) {
+            std::string key = py::str(item.first).cast<std::string>();
+            umap.insert(key);
+        };
+
+        using MapType = std::vector<std::string>;
+        auto reduce_func = [](MapType &vec1, MapType &vec2) -> MapType& {
+                vec1.reserve(vec1.size() + vec2.size());
+                vec1.insert(vec1.end(), std::make_move_iterator(vec2.begin()), std::make_move_iterator(vec2.end()));
+                return vec1;
+        };
+
+        auto map_func = [&umap](const Transaction &tx) -> MapType {
+            MapType result;
+            // if it is a ww2 coinjoin, then
+            if (umap.find(tx.getHash().GetHex()) == umap.end()) {
+                return {};
+            }
+            
+            // go through all the outputs
+            for (const auto& output : tx.outputs()) {
+                if (!output.isSpent()) continue;
+                // ignore direct coinjoin remixes
+                if (umap.find(output.getSpendingTx().value().getHash().GetHex()) != umap.end()) {
+                    continue;
+                }
+
+                // find an output that has all inputs from a coinjoin
+                bool all_inputs_from_cj = true;
+                for (auto input : output.getSpendingTx().value().inputs()) {
+                    if (umap.find(input.getSpentTx().getHash().GetHex()) == umap.end()) {
+                        all_inputs_from_cj = false;
+                        break;
+                    }
+                }
+                if (!all_inputs_from_cj) {
+                    continue;
+                }
+
+                // and check whether at least one of the outputs is mixed again
+                for (auto output2: output.getSpendingTx().value().outputs()) {
+                    if (!output2.isSpent()) continue;
+                    if (umap.find(output2.getSpendingTx().value().getHash().GetHex()) != umap.end()) {
+                        result.push_back(output.getSpendingTx().value().getHash().GetHex());
+                        break;
+                    }
+                }
+            }
+            return result;
+
+        };
+
+        return chain[{start, stop}].mapReduce<MapType, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);
+    }, "Filter the blockchain to only include txes ww2 -hop-hop-> ww2", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
+
     .def("filter_in_keys", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
         std::unordered_set<std::string> umap;
         for (auto item : keys) {

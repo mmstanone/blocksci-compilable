@@ -27,6 +27,7 @@ namespace blocksci {
     bool BLOCKSCI_EXPORT isDeanonTx(const Transaction &tx);
     bool BLOCKSCI_EXPORT containsKeysetChange(const Transaction &tx);
     bool BLOCKSCI_EXPORT isChangeOverTx(const Transaction &tx);
+    bool BLOCKSCI_EXPORT isWasabi2CoinJoin(const Transaction &tx);
 }}
 
 

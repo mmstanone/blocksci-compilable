@@ -28,6 +28,7 @@ file(GLOB PYTHON_INTERFACE_GENERIC_PROXY_SOURCES "src/generic_proxy/*.cpp")
 file(GLOB PYTHON_INTERFACE_HEADERS "src/*.hpp")
 file(GLOB PYTHON_INTERFACE_SOURCES "src/*.cpp")
 
+
 pybind11_add_module(_blocksci ${PYTHON_INTERFACE_PROXY_HEADERS} ${PYTHON_INTERFACE_PROXY_SOURCES} ${PYTHON_CHAIN_SOURCES} ${PYTHON_CLUSTER_HEADERS} ${PYTHON_CLUSTER_SOURCES} ${PYTHON_CHAIN_HEADERS} ${PYTHON_SCRIPTS_HEADERS} ${PYTHON_SCRIPTS_SOURCES} ${PYTHON_INTERFACE_SOURCES} ${PYTHON_INTERFACE_HEADERS} ${PYTHON_INTERFACE_SIMPLE_HEADERS} ${PYTHON_INTERFACE_SIMPLE_SOURCES} ${PYTHON_INTERFACE_GENERIC_PROXY_HEADERS} ${PYTHON_INTERFACE_GENERIC_PROXY_SOURCES})
 
 set_target_properties(_blocksci PROPERTIES CXX_VISIBILITY_PRESET hidden)
@@ -36,6 +37,11 @@ set_target_properties(_blocksci PROPERTIES VISIBILITY_INLINES_HIDDEN 1)
 add_subdirectory(external)
 
 target_compile_options(_blocksci PRIVATE -Wall -Wextra -Wpedantic)
+
+target_include_directories(_blocksci PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../blocksci)
+target_include_directories(_blocksci PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_include_directories(_blocksci PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../blocksci/src)
+
 
 target_link_libraries(
 	_blocksci
@@ -46,5 +52,4 @@ target_link_libraries(
 )
 
 target_include_directories (_blocksci PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-
 get_property(PYBIND11_PACKAGE_LOCATION GLOBAL PROPERTY pybind11_package_location)
