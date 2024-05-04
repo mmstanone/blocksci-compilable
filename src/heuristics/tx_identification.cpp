@@ -44,6 +44,58 @@ namespace heuristics {
         }
         return false;
     }
+
+    /**
+     * Check if a transaction looks like a Wasabi2 CoinJoin transaction.
+     * Ported from Dumplings
+    */
+    bool isWasabi2CoinJoin(const Transaction &tx) {
+    
+        // var isNativeSegwitOnly = Inputs.All(x => x.PrevOutput.ScriptPubKey.IsScriptType(ScriptType.P2WPKH)) && Outputs.All(x => x.ScriptPubKey.IsScriptType(ScriptType.P2WPKH)); // Segwit only outputs.
+        for (const auto &input : tx.inputs()) {
+            if (input.getSpentOutput().getType() != AddressType::Enum::WITNESS_PUBKEYHASH) {
+                return false;
+            }
+        }
+        for (const auto &output : tx.outputs()) {
+            if (output.getType() != AddressType::Enum::WITNESS_PUBKEYHASH) {
+                return false;
+            }
+        }
+
+        if (tx.inputCount() < 50) {
+            return false;
+        }
+
+        // Inputs are ordered descending.
+        auto prev_input_value = tx.inputs().begin()->getValue();
+        for (const auto &input : tx.inputs()) {
+            if (input.getValue() < prev_input_value) {
+                return false;
+            }
+
+            prev_input_value = input.getValue();
+        }
+
+        // Outputs are ordered descending.
+        auto prev_output_value = tx.outputs().begin()->getValue();
+        for (const auto &output : tx.outputs()) {
+            if (output.getValue() < prev_output_value) {
+                return false;
+            }
+
+            prev_output_value = output.getValue();
+        }
+
+        // Most of the outputs contains the denomination.
+        
+
+        return isNativeSegwitOnly
+                && inputCount >= 50 // 50 was the minimum input count at the beginning of Wasabi 2.
+                && inputValues.SequenceEqual(inputValues.OrderByDescending(x => x)) // Inputs are ordered descending.
+                && outputValues.SequenceEqual(outputValues.OrderByDescending(x => x)) // Outputs are ordered descending.
+                && outputValues.Count(x => Scanner.Wasabi2Denominations.Contains(x.Satoshi)) > outputCount * 0.8; // Most of the outputs contains the denomination.
+    }
     
     bool isCoinjoin(const Transaction &tx) {
         if (tx.inputCount() < 2 || tx.outputCount() < 3) {

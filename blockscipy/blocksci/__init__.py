@@ -77,7 +77,7 @@ def mapreduce_block_ranges(chain, map_func, reduce_func, init=MISSING_PARAM, sta
         end = blocks[-1].height
 
     if cpu_count == 1:
-        return mapFunc(chain[start:end])
+        return map_func(chain[start:end])
 
     raw_segments = chain._segment_indexes(start, end, cpu_count)
     segments = [(raw_segment, chain.config_location, len(chain)) for raw_segment in raw_segments]
@@ -242,6 +242,42 @@ def filter_txes_legacy(
         self, map_func, reduce_func, MISSING_PARAM, start, end, cpu_count
     )
 
+def get_spliterator(keys, workers):
+    split = len(keys) // workers
+    return [((i - 1) * split, i * split) for i in range(1, workers + 1)] + [(workers * split, workers * split + len(keys) % split)]
+
+
+
+def map_spliterator(self, map_func, keys, data_directory, workers, **kwargs):
+    """
+    Create a pool for map function on keys and events
+    @param map_func: a function that takes one argument (start, stop)
+    @param keys: what to iterate over
+    @param events: what to keep as a global state for the workers
+    @param workers: (64) how many workers (dies on Aura for > 70)
+    """
+    
+    def basic_map_func(iterator_range):
+        start, stop = iterator_range
+        chain = Blockchain(data_directory)
+        results = []
+        for i in range(start, stop):
+            current = keys[i]
+            try:
+                tx = chain.tx_with_hash(current)
+            except Exception:
+                continue
+            
+            results.append(map_func(tx, **kwargs))
+
+        return results
+
+    with Pool(workers) as pool:  # Adjust number of processes according to your system
+        all_results_future = pool.map_async(basic_map_func, get_spliterator(keys, workers))
+        print("the tasks are planned...")
+        all_results = all_results_future.get()
+    return all_results
+
 
 Blockchain.map_blocks = map_blocks
 Blockchain.filter_blocks = filter_blocks
@@ -251,6 +287,7 @@ Blockchain.filter_txes_legacy = filter_txes_legacy
 Blockchain.mapreduce_block_ranges = mapreduce_block_ranges
 Blockchain.mapreduce_blocks = mapreduce_blocks
 Blockchain.mapreduce_txes = mapreduce_txes
+Blockchain.map_spliterator = map_spliterator
 
 
 def heights_to_dates(self, df):
