@@ -7,8 +7,10 @@
 
 #include <blocksci/heuristics/tx_identification.hpp>
 #include <blocksci/chain/transaction.hpp>
+#include <blocksci/chain/block.hpp>
 #include <blocksci/chain/input.hpp>
 #include <blocksci/chain/output.hpp>
+#include <blocksci/chain/coinjoin_utils.hpp>
 #include <blocksci/scripts/script_variant.hpp>
 
 #include <range/v3/range_for.hpp>
@@ -16,6 +18,8 @@
 #include <algorithm>
 #include <unordered_set>
 #include <unordered_map>
+#include <iostream>
+#include <numeric>
 
 namespace blocksci {
 namespace heuristics {
@@ -45,20 +49,24 @@ namespace heuristics {
         return false;
     }
 
+
+
     /**
      * Check if a transaction looks like a Wasabi2 CoinJoin transaction.
      * Ported from Dumplings
     */
     bool isWasabi2CoinJoin(const Transaction &tx) {
-    
-        // var isNativeSegwitOnly = Inputs.All(x => x.PrevOutput.ScriptPubKey.IsScriptType(ScriptType.P2WPKH)) && Outputs.All(x => x.ScriptPubKey.IsScriptType(ScriptType.P2WPKH)); // Segwit only outputs.
+        // first ww2 coinjoin block
+        if (tx.getBlockHeight() < 741213) {
+            return false;
+        }
         for (const auto &input : tx.inputs()) {
-            if (input.getSpentOutput().getType() != AddressType::Enum::WITNESS_PUBKEYHASH) {
+            if (input.getType() != AddressType::Enum::WITNESS_PUBKEYHASH && input.getType() != AddressType::Enum::WITNESS_UNKNOWN) {
                 return false;
             }
         }
         for (const auto &output : tx.outputs()) {
-            if (output.getType() != AddressType::Enum::WITNESS_PUBKEYHASH) {
+            if (output.getType() != AddressType::Enum::WITNESS_PUBKEYHASH && output.getType() != AddressType::Enum::WITNESS_UNKNOWN) {
                 return false;
             }
         }
@@ -68,9 +76,10 @@ namespace heuristics {
         }
 
         // Inputs are ordered descending.
-        auto prev_input_value = tx.inputs().begin()->getValue();
+        long long prev_input_value = -1;
         for (const auto &input : tx.inputs()) {
-            if (input.getValue() < prev_input_value) {
+            
+            if (prev_input_value != -1 && input.getValue() > prev_input_value) {
                 return false;
             }
 
@@ -78,9 +87,9 @@ namespace heuristics {
         }
 
         // Outputs are ordered descending.
-        auto prev_output_value = tx.outputs().begin()->getValue();
+        long long prev_output_value = -1;
         for (const auto &output : tx.outputs()) {
-            if (output.getValue() < prev_output_value) {
+            if (prev_output_value != -1 && output.getValue() > prev_output_value) {
                 return false;
             }
 
@@ -88,13 +97,14 @@ namespace heuristics {
         }
 
         // Most of the outputs contains the denomination.
-        
+        int count = 0;
+        for (const auto &output : tx.outputs()) {
+            if (CoinjoinUtils::ww2_denominations.find(output.getValue()) != CoinjoinUtils::ww2_denominations.end()) {
+                count++;
+            }
+        }
 
-        return isNativeSegwitOnly
-                && inputCount >= 50 // 50 was the minimum input count at the beginning of Wasabi 2.
-                && inputValues.SequenceEqual(inputValues.OrderByDescending(x => x)) // Inputs are ordered descending.
-                && outputValues.SequenceEqual(outputValues.OrderByDescending(x => x)) // Outputs are ordered descending.
-                && outputValues.Count(x => Scanner.Wasabi2Denominations.Contains(x.Satoshi)) > outputCount * 0.8; // Most of the outputs contains the denomination.
+        return count > tx.outputCount() * 0.8;
     }
     
     bool isCoinjoin(const Transaction &tx) {
@@ -584,5 +594,133 @@ namespace heuristics {
         }
         
         return false;
+    }
+
+    void findSubsets(std::vector<int>::iterator start, std::vector<int>::iterator end, int sum, std::vector<int>& path, int target) {
+        // If the current sum equals the target, print the path
+        if (sum == target) {
+            return;
+        }
+
+        // If the sum exceeds the target or there are no more elements to consider, return
+        if (sum > target || start == end || path.size() >= 4) {
+            return;
+        }
+
+        // Include the current element and move to the next
+        path.push_back(*start);
+        findSubsets(std::next(start), end, sum + *start, path, target);
+
+        // Exclude the current element and move to the next
+        path.pop_back();
+        findSubsets(std::next(start), end, sum, path, target);
+    }
+
+    // Main function to start the subset sum algorithm
+    void subsetSum(std::vector<int>& numbers, int target, std::vector<int>& path) {
+        findSubsets(numbers.begin(), numbers.end(), 0, path, target);
+    }
+
+    /**
+     * tx must have an input older than 6 months
+     * tx must have an output that is spent within 3 days (spendingTx)
+     * spendingTx must go to a Wasabi2 CoinJoin (to_cj_spendingTx)
+     * to_cj_spendingTx has some value, I need to find the subset sum in coinjoin outputs that equals to_cj_spendingTx input
+     * 
+    */
+    HWWalletRemixResult isLongDormantInRemixes(const Transaction &tx) {
+        // the tx has to be dormant for 6 months and is >= 1 BTC (out -> hww)
+        if (tx.outputCount() != 1) {
+           return HWWalletRemixResult::False;
+        }
+       
+        // std::cout << 1 << std::endl;
+        auto output = tx.outputs()[0];
+
+        uint32_t tx_timestamp = tx.block().timestamp();
+        uint32_t oldest_input = tx_timestamp;
+
+        for (const auto &input : tx.inputs()) {
+            if (input.getSpentTx().block().timestamp() < oldest_input) {
+                oldest_input = input.getSpentTx().block().timestamp();
+            }
+        }
+        // std::cout << "tx: " << tx.block().timestamp() << " input: " << input.getSpentTx().block().timestamp() << std::endl;
+
+        if(tx_timestamp - oldest_input < 15814800) {  // 6 months
+            return HWWalletRemixResult::False;
+        }
+
+        if (output.getValue() <= 100000000) {
+            return HWWalletRemixResult::False;
+        }
+        // then it has to move to a new within 3 days and get remixed (hww -> cj space)
+        // std::cout << 2 << std::endl;
+
+        if (!output.isSpent()) {
+            return HWWalletRemixResult::False;
+        }
+
+        // std::cout << 3 << std::endl;
+
+        auto spendingTx = output.getSpendingTx().value();
+
+        // std::cout << 4 << std::endl;
+
+        if (output.block().timestamp() - tx.block().timestamp() > 259200) {  // should be less than 3 days
+            return HWWalletRemixResult::False;
+        }
+
+        // std::cout << 3 << std::endl;
+        
+        for (const auto& o : spendingTx.outputs()) {
+            // then to a mix (cj space -> mix)
+            auto to_cj_output = o;
+            auto value = o.getValue();
+            if (!to_cj_output.isSpent()) {
+                continue;
+            }
+
+            // std::cout << 5 << std::endl;
+
+            auto to_cj_spendingTx = to_cj_output.getSpendingTx().value();
+
+            if (!blocksci::heuristics::isWasabi2CoinJoin(to_cj_spendingTx)) {
+                continue;
+            }
+
+            std::vector<int> subsets_values = {}, path = {};
+            for (const auto& o : to_cj_spendingTx.outputs()) {
+                subsets_values.push_back(o.getValue());
+            }
+
+            subsetSum(subsets_values, value - value * 0.003, path);
+
+            if (path.size() == 0) {
+                continue;
+            }
+
+            // then if output stays for 6 months it's a HW trezor suite wallet remix (starting from 06/23)
+            // std::cout << 6 << std::endl;
+
+            if (to_cj_spendingTx.block().timestamp() > 1685570400) {
+                if (!to_cj_spendingTx.outputs()[0].isSpent() || to_cj_spendingTx.outputs()[0].getSpendingTx().value().block().timestamp() - to_cj_spendingTx.block().timestamp() < 15814800) {
+                    return HWWalletRemixResult::Trezor;
+                }
+            }
+
+
+            // std::cout << 7 << std::endl;
+            
+            // if output goes in 3 days and stays for 6 months it's a SW wallet remix
+            if (to_cj_spendingTx.block().timestamp() - to_cj_output.getSpendingTx().value().block().timestamp() < 259200) {
+                if (!to_cj_spendingTx.outputs()[0].isSpent() || to_cj_spendingTx.outputs()[0].getSpendingTx().value().block().timestamp() - to_cj_spendingTx.block().timestamp() < 15814800) {
+                    return HWWalletRemixResult::SW;
+                }
+            }
+        }
+        // otherwise it's just false
+        return HWWalletRemixResult::False;
+
     }
 }}

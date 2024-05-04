@@ -15,6 +15,7 @@
 #include <blocksci/chain/access.hpp>
 #include <blocksci/scripts/script_range.hpp>
 #include <blocksci/cluster/cluster.hpp>
+#include <blocksci/heuristics/tx_identification.hpp>
 #include "../external/json/single_include/nlohmann/json.hpp"
 
 namespace py = pybind11;
@@ -169,7 +170,13 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         };
 
         return chain[{start, stop}].mapReduce<MapType, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);
-    }, "Filter the blockchain to only include txes ww2 -hop-hop-> ww2", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
+    }, "Filter the blockchain to only include 'friends don't pay' transactions.", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
+
+    .def("filter_ww2_coinjoin_txes", [](Blockchain &chain, BlockHeight start, BlockHeight stop) {
+        return chain[{start, stop}].filter([](const Transaction &tx) {
+            return blocksci::heuristics::isWasabi2CoinJoin(tx);
+        });
+    }, "Filter ww2 coinjoin transactions", pybind11::arg("start"), pybind11::arg("stop"))
 
     .def("filter_in_keys", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
         std::unordered_set<std::string> umap;
@@ -263,6 +270,131 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         return chain[{start, stop}].mapReduce<std::vector<MapType>, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);
 
     }, "Map blockchain to get txes consolidated within 3 hops", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
+
+    .def("find_hw_sw_coinjoins", [](Blockchain &chain, BlockHeight start, BlockHeight stop) {
+        return chain[{start, stop}].filter([](const Transaction &tx) {
+            auto result = blocksci::heuristics::isLongDormantInRemixes(tx);
+
+            if (result == blocksci::heuristics::HWWalletRemixResult::False) {
+                return false;
+            }
+
+            if (result == blocksci::heuristics::HWWalletRemixResult::Trezor) {
+                // std::cout << "Trezor coinjoin: " << tx.getHash().GetHex() << std::endl;
+                return true;
+            }
+
+            // std::cout << "SW coinjoin: " << tx.getHash().GetHex() << std::endl;
+            return true;
+        });
+    }, "Filter hw_sw coinjoin transactions", pybind11::arg("start"), pybind11::arg("stop"))
+
+    .def("find_traverses_in_coinjoin_flows", [](Blockchain& chain, BlockHeight start, BlockHeight stop, const pybind11::dict &from_keys, const pybind11::dict &to_keys, bool strict = false) {
+        std::unordered_set<std::string> from_umap, to_umap;
+        for (auto item : from_keys) {
+            std::string key = py::str(item.first).cast<std::string>();
+            from_umap.insert(key);
+        }
+
+        for (auto item : to_keys) {
+            std::string key = py::str(item.first).cast<std::string>();
+            to_umap.insert(key);
+        }
+
+        using MapType = std::tuple<std::string, std::unordered_set<std::string>, std::unordered_set<std::string>, uint64_t, bool>;
+
+        auto reduce_func = [](std::vector<MapType> &vec1, std::vector<MapType> &vec2) -> std::vector<MapType> & {
+                vec1.reserve(vec1.size() + vec2.size());
+                vec1.insert(vec1.end(), std::make_move_iterator(vec2.begin()), std::make_move_iterator(vec2.end()));
+                return vec1;
+        };
+
+        auto map_func = [&from_umap, &to_umap, strict](const Transaction &tx) -> std::vector<MapType> {
+            // will run on each tx.
+            // First, check if there is input to tx from a given coinjoin - from_umap
+            // Get sum of all inputs from the coinjoin
+
+            std::unordered_set<std::string> in_coinjoins = {}, out_coinjoins = {};
+            uint64_t out_liquidity = 0;
+            for (const auto& input : tx.inputs()) {
+                if (from_umap.find(input.getSpentTx().getHash().GetHex()) != from_umap.end()) {
+                    out_liquidity += input.getValue();
+                    in_coinjoins.insert(input.getSpentTx().getHash().GetHex());
+                }
+                else if (strict) {
+                    return {};
+                }
+            }
+
+            // If sum is zero, then there is no input from the coinjoin
+            if (out_liquidity == 0) {
+                return {};
+            }
+
+            // Now, 2 cases:
+            // case 1:
+            //   there is a direct output to other coinjoin type - to_umap
+            //   we have to sum all the outputs that are spent in the coinjoin
+            // case 2:
+            //   there is one more hop to switch to a different wallet
+            //   we have to do that one more hop
+            // if strict, if there is an output anywhere else, then we ignore the tx
+
+            bool case_1 = false;
+
+            for (const auto& output : tx.outputs()) {
+                if (!output.isSpent()) continue;
+
+                if (to_umap.find(output.getSpendingTx().value().getHash().GetHex()) != to_umap.end()) {
+                    case_1 = true;
+                    break;
+                }
+            }
+            
+            uint64_t actual_liquidity = 0;
+
+            if (case_1) {
+                for (const auto& output : tx.outputs()) {
+                    if (!output.isSpent()) continue;
+
+                    if (to_umap.find(output.getSpendingTx().value().getHash().GetHex()) != to_umap.end()) {
+                        actual_liquidity += output.getValue();
+                        out_coinjoins.insert(output.getSpendingTx().value().getHash().GetHex());
+                    }
+                    else if (strict) {
+                        return {};
+                    }
+                }
+            }
+            else {
+                for (const auto& output : tx.outputs()) {
+                    if (!output.isSpent()) continue;
+   
+                    for (const auto& output2 : output.getSpendingTx().value().outputs()) {
+                        if (!output2.isSpent()) continue;
+
+                        if (to_umap.find(output2.getSpendingTx().value().getHash().GetHex()) != to_umap.end()) {
+                            actual_liquidity += output2.getValue();
+                            out_coinjoins.insert(output2.getSpendingTx().value().getHash().GetHex());
+                        }
+                        else if (strict) {
+                            return {};
+                        }
+                    }
+                }
+            }
+
+            if (out_liquidity == 0 || actual_liquidity == 0) {
+                return {};
+            }
+
+            return {{tx.getHash().GetHex(), in_coinjoins, out_coinjoins, actual_liquidity, case_1}};
+        };
+        
+        return chain[{start, stop}].mapReduce<std::vector<MapType>, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);
+
+        
+    }, "Filter transactions that traverse in coinjoin flows", pybind11::arg("start"), pybind11::arg("stop"), pybind11::arg("from_keys"), pybind11::arg("to_keys"), pybind11::arg("strict") = false)
 
 
     .def("_segment_indexes", [](Blockchain &chain, BlockHeight start, BlockHeight stop, unsigned int cpuCount) {

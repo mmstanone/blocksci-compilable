@@ -15,6 +15,10 @@
 #include <blocksci/chain/access.hpp>
 #include <blocksci/chain/blockchain.hpp>
 #include <blocksci/chain/block.hpp>
+#include <blocksci/heuristics/tx_identification.hpp>
+
+#include <pybind11/pybind11.h>
+#include <pybind11/iostream.h>
 
 namespace py = pybind11;
 
@@ -37,6 +41,9 @@ void init_tx(py::class_<Transaction> &cl) {
     .def(py::init([](const std::string hash, blocksci::Blockchain &chain) {
         return Transaction{hash, chain.getAccess()};
     }), "This functions gets the transaction with given hash.")
+    .def("is_ww2_coinjoin", [](const Transaction &tx) {
+        return blocksci::heuristics::isWasabi2CoinJoin(tx);
+    },py::call_guard<py::scoped_ostream_redirect, py::scoped_estream_redirect>(), "Returns true if this transaction is a Wasabi Wallet 2 coinjoin transaction")
     ;
 }
 

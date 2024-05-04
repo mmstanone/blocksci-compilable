@@ -20,6 +20,10 @@ namespace blocksci {
         True, False, Timeout
     };
 
+    enum class BLOCKSCI_EXPORT HWWalletRemixResult {
+        Trezor, SW, False
+    };
+
     bool BLOCKSCI_EXPORT isPeelingChain(const Transaction &tx);
     bool BLOCKSCI_EXPORT isCoinjoin(const Transaction &tx);
     CoinJoinResult BLOCKSCI_EXPORT isPossibleCoinjoin(const Transaction &tx, int64_t minBaseFee, double percentageFee, size_t maxDepth);
@@ -28,6 +32,8 @@ namespace blocksci {
     bool BLOCKSCI_EXPORT containsKeysetChange(const Transaction &tx);
     bool BLOCKSCI_EXPORT isChangeOverTx(const Transaction &tx);
     bool BLOCKSCI_EXPORT isWasabi2CoinJoin(const Transaction &tx);
+
+    HWWalletRemixResult BLOCKSCI_EXPORT isLongDormantInRemixes(const Transaction &tx);
 }}
 
 

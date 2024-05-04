@@ -17,6 +17,7 @@
 #include <blocksci/core/raw_transaction.hpp>
 #include <blocksci/core/bitcoin_uint256.hpp>
 #include <blocksci/core/transaction_data.hpp>
+#include <blocksci/chain/coinjoin_utils.hpp>
 
 #include <range/v3/utility/optional.hpp>
 
@@ -149,6 +150,10 @@ namespace blocksci {
         }
         
         Block block() const;
+
+        bool isInSet(const std::unordered_set<std::string> &txSet) const {
+            return txSet.find(getHash().GetHex()) != txSet.end();
+        }
     };
     
     inline bool BLOCKSCI_EXPORT operator==(const Transaction& a, const Transaction& b) {
