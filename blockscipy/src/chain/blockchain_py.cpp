@@ -301,7 +301,7 @@ void init_blockchain(py::class_<Blockchain> &cl) {
             to_umap.insert(key);
         }
 
-        using MapType = std::tuple<std::string, std::unordered_set<std::string>, std::unordered_set<std::string>, uint64_t, bool>;
+        using MapType = std::tuple<std::string, std::unordered_set<std::string>, std::unordered_set<std::string>, uint64_t, std::vector<std::pair<std::string, std::string>>>;
 
         auto reduce_func = [](std::vector<MapType> &vec1, std::vector<MapType> &vec2) -> std::vector<MapType> & {
                 vec1.reserve(vec1.size() + vec2.size());
@@ -310,6 +310,15 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         };
 
         auto map_func = [&from_umap, &to_umap, strict](const Transaction &tx) -> std::vector<MapType> {
+            // if it is a coinjoin, then ignore
+            if (from_umap.find(tx.getHash().GetHex()) != from_umap.end()) {
+                return {};
+            }
+
+            if (to_umap.find(tx.getHash().GetHex()) != to_umap.end()) {
+                return {};
+            }
+
             // will run on each tx.
             // First, check if there is input to tx from a given coinjoin - from_umap
             // Get sum of all inputs from the coinjoin
@@ -352,6 +361,7 @@ void init_blockchain(py::class_<Blockchain> &cl) {
             }
             
             uint64_t actual_liquidity = 0;
+            std::vector<std::pair<std::string, std::string>> hops = {};
 
             if (case_1) {
                 for (const auto& output : tx.outputs()) {
@@ -366,9 +376,18 @@ void init_blockchain(py::class_<Blockchain> &cl) {
                     }
                 }
             }
-            else {
+            else {  // case for 2 hops
                 for (const auto& output : tx.outputs()) {
                     if (!output.isSpent()) continue;
+
+                    //  the connecting tx shouldn't be any of the coinjoins
+                    if (to_umap.find(output.getSpendingTx().value().getHash().GetHex()) != to_umap.end()) {
+                        continue;
+                    }
+
+                    if (from_umap.find(output.getSpendingTx().value().getHash().GetHex()) != from_umap.end()) {
+                        continue;
+                    }
    
                     for (const auto& output2 : output.getSpendingTx().value().outputs()) {
                         if (!output2.isSpent()) continue;
@@ -376,6 +395,7 @@ void init_blockchain(py::class_<Blockchain> &cl) {
                         if (to_umap.find(output2.getSpendingTx().value().getHash().GetHex()) != to_umap.end()) {
                             actual_liquidity += output2.getValue();
                             out_coinjoins.insert(output2.getSpendingTx().value().getHash().GetHex());
+                            hops.push_back({output.getSpendingTx().value().getHash().GetHex(), output2.getSpendingTx().value().getHash().GetHex()});
                         }
                         else if (strict) {
                             return {};
@@ -388,7 +408,7 @@ void init_blockchain(py::class_<Blockchain> &cl) {
                 return {};
             }
 
-            return {{tx.getHash().GetHex(), in_coinjoins, out_coinjoins, actual_liquidity, case_1}};
+            return {{tx.getHash().GetHex(), in_coinjoins, out_coinjoins, std::min(out_liquidity, actual_liquidity), hops}};
         };
         
         return chain[{start, stop}].mapReduce<std::vector<MapType>, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);
