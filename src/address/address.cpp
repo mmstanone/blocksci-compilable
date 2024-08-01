@@ -74,6 +74,7 @@ namespace blocksci {
                     }
                 }
                 assert(false);
+                return ranges::nullopt;
             } else {
                 return ranges::nullopt;
             }

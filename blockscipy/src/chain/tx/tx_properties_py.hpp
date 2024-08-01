@@ -12,6 +12,7 @@
 
 #include <blocksci/chain/algorithms.hpp>
 #include <blocksci/chain/block.hpp>
+#include <blocksci/heuristics/tx_identification.hpp>
 
 #include <pybind11/chrono.h>
 #include <pybind11/operators.h>
@@ -78,6 +79,12 @@ struct AddTransactionMethods {
         }, "If this transaction included a null data address, return its output. Otherwise return None");
         func(method_tag, "includes_output_of_type", includesOutputOfType, "Check whether the given transaction includes an output of the given address type", pybind11::arg("address_type"));
         func(property_tag, "is_coinbase", &Transaction::isCoinbase, "Return's true if this transaction is a Coinbase transaction");
+        func(property_tag, "is_wasabi2_coinjoin", +[](const Transaction &tx) {
+            return blocksci::heuristics::isWasabi2CoinJoin(tx);
+        }, "Return's true if this transaction is a Wasabi CoinJoin transaction");
+        func(property_tag, "is_whirlpool_coinjoin", +[](const Transaction &tx) {
+            return blocksci::heuristics::isWhirlpoolCoinJoin(tx);
+        }, "Return's true if this transaction is a Whirlpool CoinJoin transaction");
     }
 };
 

@@ -32,6 +32,8 @@ namespace blocksci {
     bool BLOCKSCI_EXPORT containsKeysetChange(const Transaction &tx);
     bool BLOCKSCI_EXPORT isChangeOverTx(const Transaction &tx);
     bool BLOCKSCI_EXPORT isWasabi2CoinJoin(const Transaction &tx);
+    bool BLOCKSCI_EXPORT isWasabi1CoinJoin(const Transaction &tx);
+    bool BLOCKSCI_EXPORT isWhirlpoolCoinJoin(const Transaction &tx);
 
     HWWalletRemixResult BLOCKSCI_EXPORT isLongDormantInRemixes(const Transaction &tx);
 }}
