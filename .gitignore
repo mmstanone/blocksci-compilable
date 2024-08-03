@@ -15,3 +15,7 @@ blockscipy/dist/*
 .pytest_cache
 .idea
 .benchmarks
+venv
+cmake-build-debug
+.vscode
+*.ipynb_checkpoints

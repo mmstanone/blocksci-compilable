@@ -20,62 +20,62 @@ namespace blocksci {
     
     template <>
     struct DedupAddressInfo<DedupAddressType::PUBKEY> {
-        static constexpr char name[] = "pubkey_script";
-        static constexpr bool equived = true;
-        static constexpr bool spendable = true;
-        static constexpr bool indexed = false;
-        static constexpr std::array<AddressType::Enum, 4> equivTypes = {{AddressType::PUBKEY, AddressType::PUBKEYHASH, AddressType::MULTISIG_PUBKEY, AddressType::WITNESS_PUBKEYHASH}};
-        static constexpr AddressType::Enum reprType = AddressType::PUBKEYHASH;
+        static inline constexpr char name[] = "pubkey_script";
+        static inline constexpr bool equived = true;
+        static inline constexpr bool spendable = true;
+        static inline constexpr bool indexed = false;
+        static inline constexpr std::array<AddressType::Enum, 4> equivTypes = {{AddressType::PUBKEY, AddressType::PUBKEYHASH, AddressType::MULTISIG_PUBKEY, AddressType::WITNESS_PUBKEYHASH}};
+        static inline constexpr AddressType::Enum reprType = AddressType::PUBKEYHASH;
     };
     
     template <>
     struct DedupAddressInfo<DedupAddressType::SCRIPTHASH> {
-        static constexpr char name[] = "scripthash_script";
-        static constexpr bool equived = true;
-        static constexpr bool spendable = true;
-        static constexpr bool indexed = false;
-        static constexpr std::array<AddressType::Enum, 2> equivTypes = {{AddressType::SCRIPTHASH, AddressType::WITNESS_SCRIPTHASH}};
-        static constexpr AddressType::Enum reprType = AddressType::SCRIPTHASH;
+        static inline constexpr char name[] = "scripthash_script";
+        static inline constexpr bool equived = true;
+        static inline constexpr bool spendable = true;
+        static inline constexpr bool indexed = false;
+        static inline constexpr std::array<AddressType::Enum, 2> equivTypes = {{AddressType::SCRIPTHASH, AddressType::WITNESS_SCRIPTHASH}};
+        static inline constexpr AddressType::Enum reprType = AddressType::SCRIPTHASH;
     };
     
     template <>
     struct DedupAddressInfo<DedupAddressType::MULTISIG> {
-        static constexpr char name[] = "multisig_script";
-        static constexpr bool equived = true;
-        static constexpr bool spendable = true;
-        static constexpr bool indexed = true;
-        static constexpr std::array<AddressType::Enum, 1> equivTypes = {{AddressType::MULTISIG}};
-        static constexpr AddressType::Enum reprType = AddressType::MULTISIG;
+        static inline constexpr char name[] = "multisig_script";
+        static inline constexpr bool equived = true;
+        static inline constexpr bool spendable = true;
+        static inline constexpr bool indexed = true;
+        static inline constexpr std::array<AddressType::Enum, 1> equivTypes = {{AddressType::MULTISIG}};
+        static inline constexpr AddressType::Enum reprType = AddressType::MULTISIG;
     };
     
     template <>
     struct DedupAddressInfo<DedupAddressType::NONSTANDARD> {
-        static constexpr char name[] = "nonstandard_script";
-        static constexpr bool equived = false;
-        static constexpr bool spendable = true;
-        static constexpr bool indexed = true;
-        static constexpr std::array<AddressType::Enum, 1> equivTypes = {{AddressType::NONSTANDARD}};
-        static constexpr AddressType::Enum reprType = AddressType::NONSTANDARD;
+        static inline constexpr char name[] = "nonstandard_script";
+        static inline constexpr bool equived = false;
+        static inline constexpr bool spendable = true;
+        static inline constexpr bool indexed = true;
+        static inline constexpr std::array<AddressType::Enum, 1> equivTypes = {{AddressType::NONSTANDARD}};
+        static inline constexpr AddressType::Enum reprType = AddressType::NONSTANDARD;
     };
     
     template <>
     struct DedupAddressInfo<DedupAddressType::NULL_DATA> {
-        static constexpr char name[] = "null_data_script";
-        static constexpr bool equived = false;
-        static constexpr bool spendable = false;
-        static constexpr bool indexed = true;
-        static constexpr std::array<AddressType::Enum, 1> equivTypes = {{AddressType::NULL_DATA}};
-        static constexpr AddressType::Enum reprType = AddressType::NULL_DATA;
+        static inline constexpr char name[] = "null_data_script";
+        static inline constexpr bool equived = false;
+        static inline constexpr bool spendable = false;
+        static inline constexpr bool indexed = true;
+        static inline constexpr std::array<AddressType::Enum, 1> equivTypes = {{AddressType::NULL_DATA}};
+        static inline constexpr AddressType::Enum reprType = AddressType::NULL_DATA;
     };
     
     template <>
     struct DedupAddressInfo<DedupAddressType::WITNESS_UNKNOWN> {
-        static constexpr char name[] = "witness_unknown";
-        static constexpr bool equived = false;
-        static constexpr bool spendable = true;
-        static constexpr bool indexed = true;
-        static constexpr std::array<AddressType::Enum, 1> equivTypes = {{AddressType::WITNESS_UNKNOWN}};
-        static constexpr AddressType::Enum reprType = AddressType::WITNESS_UNKNOWN;
+        static inline constexpr char name[] = "witness_unknown";
+        static inline constexpr bool equived = false;
+        static inline constexpr bool spendable = true;
+        static inline constexpr bool indexed = true;
+        static inline constexpr std::array<AddressType::Enum, 1> equivTypes = {{AddressType::WITNESS_UNKNOWN}};
+        static inline constexpr AddressType::Enum reprType = AddressType::WITNESS_UNKNOWN;
     };
     
     template<DedupAddressType::Enum type>

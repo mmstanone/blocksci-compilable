@@ -34,6 +34,7 @@ from .opreturn import label_application
 from .pickler import *
 
 VERSION = "0.7.0"
+CPU_COUNT = 64
 
 
 sys.modules['blocksci.proxy'] = proxy
@@ -64,7 +65,7 @@ if time.tzname != ('UTC', 'UTC'):
 
 
 
-def mapreduce_block_ranges(chain, map_func, reduce_func, init=MISSING_PARAM, start=None, end=None, cpu_count=psutil.cpu_count()):
+def mapreduce_block_ranges(chain, map_func, reduce_func, init=MISSING_PARAM, start=None, end=None, cpu_count=CPU_COUNT):
     """Initialized multithreaded map reduce function over a stream of block ranges
     """
     if start is None:
@@ -103,7 +104,7 @@ def mapreduce_block_ranges(chain, map_func, reduce_func, init=MISSING_PARAM, sta
         return reduce(reduce_func, results, init)
 
 
-def mapreduce_blocks(chain, map_func, reduce_func, init=MISSING_PARAM, start=None, end=None, cpu_count=psutil.cpu_count()):
+def mapreduce_blocks(chain, map_func, reduce_func, init=MISSING_PARAM, start=None, end=None, cpu_count=CPU_COUNT):
     """Initialized multithreaded map reduce function over a stream of blocks
     """
     def map_range_func(blocks):
@@ -126,7 +127,7 @@ def mapreduce_blocks(chain, map_func, reduce_func, init=MISSING_PARAM, start=Non
     )
 
 
-def mapreduce_txes(chain, map_func, reduce_func, init=MISSING_PARAM, start=None, end=None, cpu_count=psutil.cpu_count()):
+def mapreduce_txes(chain, map_func, reduce_func, init=MISSING_PARAM, start=None, end=None, cpu_count=CPU_COUNT):
     """Initialized multithreaded map reduce function over a stream of transactions
     """
     def map_range_func(blocks):
@@ -152,7 +153,7 @@ def mapreduce_txes(chain, map_func, reduce_func, init=MISSING_PARAM, start=None,
     )
 
 
-def map_blocks(self, block_func, start=None, end=None, cpu_count=psutil.cpu_count()):
+def map_blocks(self, block_func, start=None, end=None, cpu_count=CPU_COUNT):
     """Runs the given function over each block in range and returns a list of the results
     """
     def map_func(blocks):
@@ -174,7 +175,7 @@ def map_blocks(self, block_func, start=None, end=None, cpu_count=psutil.cpu_coun
 
 
 def filter_blocks(
-    self, filter_func, start=None, end=None, cpu_count=psutil.cpu_count()
+    self, filter_func, start=None, end=None, cpu_count=CPU_COUNT
 ):
     """Return all blocks in range which match the given criteria
     """
@@ -192,7 +193,7 @@ def filter_blocks(
 
 
 def filter_blocks_legacy(
-    self, filter_func, start=None, end=None, cpu_count=psutil.cpu_count()
+    self, filter_func, start=None, end=None, cpu_count=CPU_COUNT
 ):
     """Return all blocks in range which match the given criteria
     """
@@ -209,7 +210,7 @@ def filter_blocks_legacy(
     )
 
 
-def filter_txes(self, filter_func, start=None, end=None, cpu_count=psutil.cpu_count()):
+def filter_txes(self, filter_func, start=None, end=None, cpu_count=CPU_COUNT):
     """Return all transactions in range which match the given criteria
     """
 
@@ -226,7 +227,7 @@ def filter_txes(self, filter_func, start=None, end=None, cpu_count=psutil.cpu_co
 
 
 def filter_txes_legacy(
-    self, filter_func, start=None, end=None, cpu_count=psutil.cpu_count()
+    self, filter_func, start=None, end=None, cpu_count=CPU_COUNT
 ):
     """Return all transactions in range which match the given criteria
     """

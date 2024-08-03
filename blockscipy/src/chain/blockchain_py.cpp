@@ -15,6 +15,7 @@
 #include <blocksci/chain/access.hpp>
 #include <blocksci/scripts/script_range.hpp>
 #include <blocksci/cluster/cluster.hpp>
+#include <unordered_map>
 #include <blocksci/heuristics/tx_identification.hpp>
 #include "../external/json/single_include/nlohmann/json.hpp"
 
@@ -178,6 +179,18 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         });
     }, "Filter ww2 coinjoin transactions", pybind11::arg("start"), pybind11::arg("stop"))
 
+    .def("filter_wp_coinjoin_txes", [](Blockchain &chain, BlockHeight start, BlockHeight stop) {
+        return chain[{start, stop}].filter([](const Transaction &tx) {
+            return blocksci::heuristics::isWhirlpoolCoinJoin(tx);
+        });
+    }, "Filter whirlpool coinjoin transactions", pybind11::arg("start"), pybind11::arg("stop"))
+
+    .def("filter_timestamped_txes", [](Blockchain &chain, BlockHeight start, BlockHeight stop) {
+        return chain[{start, stop}].filter([](const Transaction &tx) {
+            return tx.getTimeSeen().has_value() || tx.getTimestampSeen().has_value();
+        });
+    }, "Filter timestamped transactions", pybind11::arg("start"), pybind11::arg("stop"))
+
     .def("filter_in_keys", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
         std::unordered_set<std::string> umap;
         for (auto item : keys) {
@@ -190,6 +203,13 @@ void init_blockchain(py::class_<Blockchain> &cl) {
             return umap.find(tx.getHash().GetHex()) != umap.end();
         });
     }, "Filter the blockchain to only include txes with the given keys", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
+
+    .def("filter_seen_in_timeframe", [](Blockchain &chain, BlockHeight start, BlockHeight stop, uint64_t start_time, uint64_t end_time) {
+        return chain[{start, stop}].filter([start_time, end_time](const Block &block) {
+            
+            return block.timestamp() >= start_time && block.timestamp() <= end_time;
+        });
+    }, "Filter the blockchain to only include blocks seen in the given timeframe. Time is in unix timestamp, in seconds.", pybind11::arg("start"), pybind11::arg("stop"), pybind11::arg("start_time"), pybind11::arg("end_time"))
 
 
     .def("find_consolidation_3_hops", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
@@ -301,7 +321,7 @@ void init_blockchain(py::class_<Blockchain> &cl) {
             to_umap.insert(key);
         }
 
-        using MapType = std::tuple<std::string, std::unordered_set<std::string>, std::unordered_set<std::string>, uint64_t, bool>;
+        using MapType = std::tuple<std::string, std::unordered_map<std::string, int64_t>, std::unordered_map<std::string, int64_t>, uint64_t, std::vector<std::pair<std::string, std::string>>>;
 
         auto reduce_func = [](std::vector<MapType> &vec1, std::vector<MapType> &vec2) -> std::vector<MapType> & {
                 vec1.reserve(vec1.size() + vec2.size());
@@ -310,16 +330,25 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         };
 
         auto map_func = [&from_umap, &to_umap, strict](const Transaction &tx) -> std::vector<MapType> {
+            // if it is a coinjoin, then ignore
+            if (from_umap.find(tx.getHash().GetHex()) != from_umap.end()) {
+                return {};
+            }
+
+            if (to_umap.find(tx.getHash().GetHex()) != to_umap.end()) {
+                return {};
+            }
+
             // will run on each tx.
             // First, check if there is input to tx from a given coinjoin - from_umap
             // Get sum of all inputs from the coinjoin
 
-            std::unordered_set<std::string> in_coinjoins = {}, out_coinjoins = {};
+            std::unordered_map<std::string, int64_t> in_coinjoins = {}, out_coinjoins = {};
             uint64_t out_liquidity = 0;
             for (const auto& input : tx.inputs()) {
                 if (from_umap.find(input.getSpentTx().getHash().GetHex()) != from_umap.end()) {
                     out_liquidity += input.getValue();
-                    in_coinjoins.insert(input.getSpentTx().getHash().GetHex());
+                    in_coinjoins[input.getSpentTx().getHash().GetHex()] = input.getValue();
                 }
                 else if (strict) {
                     return {};
@@ -352,6 +381,7 @@ void init_blockchain(py::class_<Blockchain> &cl) {
             }
             
             uint64_t actual_liquidity = 0;
+            std::vector<std::pair<std::string, std::string>> hops = {};
 
             if (case_1) {
                 for (const auto& output : tx.outputs()) {
@@ -359,23 +389,33 @@ void init_blockchain(py::class_<Blockchain> &cl) {
 
                     if (to_umap.find(output.getSpendingTx().value().getHash().GetHex()) != to_umap.end()) {
                         actual_liquidity += output.getValue();
-                        out_coinjoins.insert(output.getSpendingTx().value().getHash().GetHex());
+                        out_coinjoins[output.getSpendingTx().value().getHash().GetHex()] = output.getValue();
                     }
                     else if (strict) {
                         return {};
                     }
                 }
             }
-            else {
+            else {  // case for 2 hops
                 for (const auto& output : tx.outputs()) {
                     if (!output.isSpent()) continue;
+
+                    //  the connecting tx shouldn't be any of the coinjoins
+                    if (to_umap.find(output.getSpendingTx().value().getHash().GetHex()) != to_umap.end()) {
+                        continue;
+                    }
+
+                    if (from_umap.find(output.getSpendingTx().value().getHash().GetHex()) != from_umap.end()) {
+                        continue;
+                    }
    
                     for (const auto& output2 : output.getSpendingTx().value().outputs()) {
                         if (!output2.isSpent()) continue;
 
                         if (to_umap.find(output2.getSpendingTx().value().getHash().GetHex()) != to_umap.end()) {
                             actual_liquidity += output2.getValue();
-                            out_coinjoins.insert(output2.getSpendingTx().value().getHash().GetHex());
+                            out_coinjoins[output2.getSpendingTx().value().getHash().GetHex()] = output2.getValue();
+                            hops.push_back({output.getSpendingTx().value().getHash().GetHex(), output2.getSpendingTx().value().getHash().GetHex()});
                         }
                         else if (strict) {
                             return {};
@@ -388,7 +428,7 @@ void init_blockchain(py::class_<Blockchain> &cl) {
                 return {};
             }
 
-            return {{tx.getHash().GetHex(), in_coinjoins, out_coinjoins, actual_liquidity, case_1}};
+            return {{tx.getHash().GetHex(), in_coinjoins, out_coinjoins, std::min(out_liquidity, actual_liquidity), hops}};
         };
         
         return chain[{start, stop}].mapReduce<std::vector<MapType>, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);

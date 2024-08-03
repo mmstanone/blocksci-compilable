@@ -55,9 +55,9 @@ namespace heuristics {
      * Check if a transaction looks like a Wasabi2 CoinJoin transaction.
      * Ported from Dumplings
     */
-    bool isWasabi2CoinJoin(const Transaction &tx) {
+    bool isWasabi2CoinJoin(const Transaction &tx, uint64_t minInputCount = 50) {
         // first ww2 coinjoin block
-        if (tx.getBlockHeight() < 741213) {
+        if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstWasabi2Block) {
             return false;
         }
         for (const auto &input : tx.inputs()) {
@@ -71,7 +71,7 @@ namespace heuristics {
             }
         }
 
-        if (tx.inputCount() < 50) {
+        if (tx.inputCount() < minInputCount) {
             return false;
         }
 
@@ -634,7 +634,6 @@ namespace heuristics {
            return HWWalletRemixResult::False;
         }
        
-        // std::cout << 1 << std::endl;
         auto output = tx.outputs()[0];
 
         uint32_t tx_timestamp = tx.block().timestamp();
@@ -645,7 +644,6 @@ namespace heuristics {
                 oldest_input = input.getSpentTx().block().timestamp();
             }
         }
-        // std::cout << "tx: " << tx.block().timestamp() << " input: " << input.getSpentTx().block().timestamp() << std::endl;
 
         if(tx_timestamp - oldest_input < 15814800) {  // 6 months
             return HWWalletRemixResult::False;
@@ -655,17 +653,12 @@ namespace heuristics {
             return HWWalletRemixResult::False;
         }
         // then it has to move to a new within 3 days and get remixed (hww -> cj space)
-        // std::cout << 2 << std::endl;
 
         if (!output.isSpent()) {
             return HWWalletRemixResult::False;
         }
 
-        // std::cout << 3 << std::endl;
-
         auto spendingTx = output.getSpendingTx().value();
-
-        // std::cout << 4 << std::endl;
 
         if (output.block().timestamp() - tx.block().timestamp() > 259200) {  // should be less than 3 days
             return HWWalletRemixResult::False;
@@ -680,8 +673,6 @@ namespace heuristics {
             if (!to_cj_output.isSpent()) {
                 continue;
             }
-
-            // std::cout << 5 << std::endl;
 
             auto to_cj_spendingTx = to_cj_output.getSpendingTx().value();
 
@@ -721,6 +712,82 @@ namespace heuristics {
         }
         // otherwise it's just false
         return HWWalletRemixResult::False;
+
+    }
+
+    bool isWasabi1CoinJoin(const Transaction &tx) {
+        if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstWasabiBlock) {
+            return false;
+        }
+
+        if (blocksci::heuristics::isWasabi2CoinJoin(tx)) {
+            return false;
+        }
+        return true;
+
+    }
+
+    bool isWhirlpoolCoinJoin(const Transaction &tx) {
+        if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstSamouraiBlock) {
+            return false;
+        }
+
+        auto current_pool_size = tx.outputs()[0].getValue();
+
+        if (current_pool_size != 50000000 && current_pool_size != 5000000 && current_pool_size != 1000000 && current_pool_size != 100000) {
+            return false;
+        }
+        auto input_count = tx.inputCount();
+        auto output_count = tx.outputCount();
+
+        if (input_count < 5 || input_count > 10) {
+            return false;
+        }
+
+        if (output_count < 5 || output_count > 10) {
+            return false;
+        }
+
+        if (input_count != output_count) {
+            return false;
+        }
+
+        std::unordered_map<int64_t, int> outputValues;
+        RANGES_FOR (auto output, tx.outputs()) {
+            outputValues[output.getValue()]++;
+        }
+
+        if (outputValues.size() != 1) {
+            return false;
+        }
+
+        if (outputValues.begin()->first != current_pool_size) {
+            return false;
+        }
+
+        auto poolSizedInputCount = std::count_if(tx.inputs().begin(), tx.inputs().end(), [current_pool_size](const Input& input) {
+            return input.getValue() == current_pool_size;
+        });
+
+        if (poolSizedInputCount < 1) {
+            return false;
+        }
+
+        return std::count_if(tx.inputs().begin(), tx.inputs().end(), [current_pool_size](const Input& input) {
+            return input.getValue() != current_pool_size && input.getValue() > current_pool_size && (input.getValue() - current_pool_size) < 110000;
+        });
+
+
+        // var poolSizedInputCount = tx.Inputs.Count(x => x.PrevOutput.Value == poolSize);
+        // isSamouraiCj =
+        //    isNativeSegwitOnly
+        //    && inputCount >= 5 && inputCount <= 10
+        //    && outputCount >= 5 && outputCount <= 10
+        //    && inputCount == outputCount
+        //    && outputValues.Distinct().Count() == 1 // Outputs are always equal.
+        //    && Constants.SamouraiPools.Any(x => x == poolSize) // Just to be sure match Samourai's pool sizes.
+        //    && poolSizedInputCount >= 1
+        //    && tx.Inputs.Where(x => x.PrevOutput.Value != poolSize).All(x => x.PrevOutput.Value.Almost(poolSize, Money.Coins(0.0011m)));
 
     }
 }}
