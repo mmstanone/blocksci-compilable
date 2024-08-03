@@ -79,12 +79,15 @@ struct AddTransactionMethods {
         }, "If this transaction included a null data address, return its output. Otherwise return None");
         func(method_tag, "includes_output_of_type", includesOutputOfType, "Check whether the given transaction includes an output of the given address type", pybind11::arg("address_type"));
         func(property_tag, "is_coinbase", &Transaction::isCoinbase, "Return's true if this transaction is a Coinbase transaction");
-        func(property_tag, "is_wasabi2_coinjoin", +[](const Transaction &tx) {
+        func(property_tag, "is_wasabi2_coinjoin", +[](const Transaction &tx) -> bool {
             return blocksci::heuristics::isWasabi2CoinJoin(tx);
         }, "Return's true if this transaction is a Wasabi CoinJoin transaction");
-        func(property_tag, "is_whirlpool_coinjoin", +[](const Transaction &tx) {
+        func(property_tag, "is_whirlpool_coinjoin", +[](const Transaction &tx) -> bool {
             return blocksci::heuristics::isWhirlpoolCoinJoin(tx);
         }, "Return's true if this transaction is a Whirlpool CoinJoin transaction");
+        func(property_tag, "is_wasabi2_coinjoin_with_input_count", +[](const Transaction &tx, uint64_t min_input_count) -> bool {
+            return blocksci::heuristics::isWasabi2CoinJoin(tx, min_input_count);
+        }, "Return's true if this transaction is a CoinJoin transaction with given `min_input_count`");
     }
 };
 

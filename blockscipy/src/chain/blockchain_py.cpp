@@ -204,6 +204,13 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         });
     }, "Filter the blockchain to only include txes with the given keys", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
 
+    .def("filter_seen_in_timeframe", [](Blockchain &chain, BlockHeight start, BlockHeight stop, uint64_t start_time, uint64_t end_time) {
+        return chain[{start, stop}].filter([start_time, end_time](const Block &block) {
+            
+            return block.timestamp() >= start_time && block.timestamp() <= end_time;
+        });
+    }, "Filter the blockchain to only include blocks seen in the given timeframe. Time is in unix timestamp, in seconds.", pybind11::arg("start"), pybind11::arg("stop"), pybind11::arg("start_time"), pybind11::arg("end_time"))
+
 
     .def("find_consolidation_3_hops", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
         std::unordered_set<std::string> umap;

@@ -55,7 +55,7 @@ namespace heuristics {
      * Check if a transaction looks like a Wasabi2 CoinJoin transaction.
      * Ported from Dumplings
     */
-    bool isWasabi2CoinJoin(const Transaction &tx) {
+    bool isWasabi2CoinJoin(const Transaction &tx, uint64_t minInputCount = 50) {
         // first ww2 coinjoin block
         if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstWasabi2Block) {
             return false;
@@ -71,7 +71,7 @@ namespace heuristics {
             }
         }
 
-        if (tx.inputCount() < 50) {
+        if (tx.inputCount() < minInputCount) {
             return false;
         }
 
@@ -634,7 +634,6 @@ namespace heuristics {
            return HWWalletRemixResult::False;
         }
        
-        // std::cout << 1 << std::endl;
         auto output = tx.outputs()[0];
 
         uint32_t tx_timestamp = tx.block().timestamp();
@@ -645,7 +644,6 @@ namespace heuristics {
                 oldest_input = input.getSpentTx().block().timestamp();
             }
         }
-        // std::cout << "tx: " << tx.block().timestamp() << " input: " << input.getSpentTx().block().timestamp() << std::endl;
 
         if(tx_timestamp - oldest_input < 15814800) {  // 6 months
             return HWWalletRemixResult::False;
@@ -655,17 +653,12 @@ namespace heuristics {
             return HWWalletRemixResult::False;
         }
         // then it has to move to a new within 3 days and get remixed (hww -> cj space)
-        // std::cout << 2 << std::endl;
 
         if (!output.isSpent()) {
             return HWWalletRemixResult::False;
         }
 
-        // std::cout << 3 << std::endl;
-
         auto spendingTx = output.getSpendingTx().value();
-
-        // std::cout << 4 << std::endl;
 
         if (output.block().timestamp() - tx.block().timestamp() > 259200) {  // should be less than 3 days
             return HWWalletRemixResult::False;
@@ -680,8 +673,6 @@ namespace heuristics {
             if (!to_cj_output.isSpent()) {
                 continue;
             }
-
-            // std::cout << 5 << std::endl;
 
             auto to_cj_spendingTx = to_cj_output.getSpendingTx().value();
 
