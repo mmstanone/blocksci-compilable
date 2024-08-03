@@ -85,9 +85,9 @@ struct AddTransactionMethods {
         func(property_tag, "is_whirlpool_coinjoin", +[](const Transaction &tx) -> bool {
             return blocksci::heuristics::isWhirlpoolCoinJoin(tx);
         }, "Return's true if this transaction is a Whirlpool CoinJoin transaction");
-        func(property_tag, "is_wasabi2_coinjoin_with_input_count", +[](const Transaction &tx, uint64_t min_input_count) -> bool {
+        func(method_tag, "is_wasabi2_coinjoin_with_input_count", +[](const Transaction &tx, uint64_t min_input_count) -> bool {
             return blocksci::heuristics::isWasabi2CoinJoin(tx, min_input_count);
-        }, "Return's true if this transaction is a CoinJoin transaction with given `min_input_count`");
+        }, "Return's true if this transaction is a CoinJoin transaction with given `min_input_count`", pybind11::arg("min_input_count") = 50); 
     }
 };
 

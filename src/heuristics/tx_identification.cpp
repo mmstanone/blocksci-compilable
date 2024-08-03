@@ -55,7 +55,7 @@ namespace heuristics {
      * Check if a transaction looks like a Wasabi2 CoinJoin transaction.
      * Ported from Dumplings
     */
-    bool isWasabi2CoinJoin(const Transaction &tx, uint64_t minInputCount = 50) {
+    bool isWasabi2CoinJoin(const Transaction &tx, uint64_t minInputCount) {
         // first ww2 coinjoin block
         if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstWasabi2Block) {
             return false;
