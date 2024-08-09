@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <iostream>
 #include <numeric>
+#include <optional>
 
 namespace blocksci {
 namespace heuristics {
@@ -55,7 +56,7 @@ namespace heuristics {
      * Check if a transaction looks like a Wasabi2 CoinJoin transaction.
      * Ported from Dumplings
     */
-    bool isWasabi2CoinJoin(const Transaction &tx, uint64_t minInputCount = 50) {
+    bool isWasabi2CoinJoin(const Transaction &tx, std::optional<uint64_t> inputCount) {
         // first ww2 coinjoin block
         if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstWasabi2Block) {
             return false;
@@ -71,7 +72,7 @@ namespace heuristics {
             }
         }
 
-        if (tx.inputCount() < minInputCount) {
+        if ((inputCount.has_value() && tx.inputCount() != inputCount) || (!inputCount.has_value() && tx.inputCount() < 50)) {
             return false;
         }
 

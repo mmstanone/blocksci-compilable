@@ -211,6 +211,10 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         });
     }, "Filter the blockchain to only include blocks seen in the given timeframe. Time is in unix timestamp, in seconds.", pybind11::arg("start"), pybind11::arg("stop"), pybind11::arg("start_time"), pybind11::arg("end_time"))
 
+    .def("find_whirlpool_consolidations", [](Blockchain &chain, BlockHeight start, BlockHeight stop) {
+        
+    }, "Filter whirlpool consolidation transactions", pybind11::arg("start"), pybind11::arg("stop"))
+
 
     .def("find_consolidation_3_hops", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
         std::unordered_set<std::string> umap;

@@ -31,7 +31,7 @@ namespace blocksci {
     bool BLOCKSCI_EXPORT isDeanonTx(const Transaction &tx);
     bool BLOCKSCI_EXPORT containsKeysetChange(const Transaction &tx);
     bool BLOCKSCI_EXPORT isChangeOverTx(const Transaction &tx);
-    bool BLOCKSCI_EXPORT isWasabi2CoinJoin(const Transaction &tx, uint64_t minInputCount);
+    bool BLOCKSCI_EXPORT isWasabi2CoinJoin(const Transaction &tx, std::optional<uint64_t> minInputCount = std::nullopt);
     bool BLOCKSCI_EXPORT isWasabi1CoinJoin(const Transaction &tx);
     bool BLOCKSCI_EXPORT isWhirlpoolCoinJoin(const Transaction &tx);
 
