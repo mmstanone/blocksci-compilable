@@ -190,11 +190,6 @@ void init_blockchain(py::class_<Blockchain> &cl) {
             return tx.getTimeSeen().has_value() || tx.getTimestampSeen().has_value();
         });
     }, "Filter timestamped transactions", pybind11::arg("start"), pybind11::arg("stop"))
-    .def("filter_variable_input_ww2_coinjoins", [](Blockchain &chain, BlockHeight start, BlockHeight stop, uint64_t min_input_count) {
-        return chain[{start, stop}].filter([min_input_count](const Transaction &tx) {
-            return blocksci::heuristics::isWasabi2CoinJoin(tx, min_input_count);
-        });
-    }, "Filter variable input ww2 coinjoin transactions", pybind11::arg("start"), pybind11::arg("stop"), pybind11::arg("min_input_count") = 50)
 
     .def("filter_in_keys", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
         std::unordered_set<std::string> umap;
@@ -215,6 +210,10 @@ void init_blockchain(py::class_<Blockchain> &cl) {
             return block.timestamp() >= start_time && block.timestamp() <= end_time;
         });
     }, "Filter the blockchain to only include blocks seen in the given timeframe. Time is in unix timestamp, in seconds.", pybind11::arg("start"), pybind11::arg("stop"), pybind11::arg("start_time"), pybind11::arg("end_time"))
+
+    .def("find_whirlpool_consolidations", [](Blockchain &chain, BlockHeight start, BlockHeight stop) {
+        
+    }, "Filter whirlpool consolidation transactions", pybind11::arg("start"), pybind11::arg("stop"))
 
 
     .def("find_consolidation_3_hops", [](Blockchain &chain, const pybind11::dict &keys, BlockHeight start, BlockHeight stop) {
