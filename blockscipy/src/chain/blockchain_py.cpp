@@ -212,7 +212,53 @@ void init_blockchain(py::class_<Blockchain> &cl) {
     }, "Filter the blockchain to only include blocks seen in the given timeframe. Time is in unix timestamp, in seconds.", pybind11::arg("start"), pybind11::arg("stop"), pybind11::arg("start_time"), pybind11::arg("end_time"))
 
     .def("find_whirlpool_consolidations", [](Blockchain &chain, BlockHeight start, BlockHeight stop) {
-        
+        using MapType = std::vector<std::string>;
+        auto reduce_func = [](MapType &vec1, MapType &vec2) -> MapType& {
+                vec1.reserve(vec1.size() + vec2.size());
+                vec1.insert(vec1.end(), std::make_move_iterator(vec2.begin()), std::make_move_iterator(vec2.end()));
+                return vec1;
+        };
+
+        auto map_func = [](const Transaction &tx) -> MapType {
+            if (!blocksci::heuristics::isWhirlpoolCoinJoin(tx)) {
+                return {};
+            }
+            
+            MapType result;
+
+            // go through all the outputs
+            for (const auto& output : tx.outputs()) {
+                if (!output.isSpent()) continue;
+                auto spending_tx = output.getSpendingTx().value();
+                if (blocksci::heuristics::isWhirlpoolCoinJoin(spending_tx)) {
+                    continue;
+                }
+
+
+                // check if the spending tx is a consolidation tx
+                // this one is a random value we will adjust later
+                // 2* input > output
+                if (spending_tx.inputCount() < spending_tx.outputCount()) {
+                    continue;
+                }
+
+                auto from_whirlpool = 0;
+                for (const auto& input: spending_tx.inputs()) {
+                    if (blocksci::heuristics::isWhirlpoolCoinJoin(input.getSpentTx())) {
+                        from_whirlpool++;
+                    }
+                }
+
+                if (static_cast<double>(from_whirlpool) > 0.5 * static_cast<double>(spending_tx.inputCount())) {
+                    result.push_back(spending_tx.getHash().GetHex());
+                }
+            }
+                
+            return result;
+
+        };
+
+        return chain[{start, stop}].mapReduce<MapType, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);
     }, "Filter whirlpool consolidation transactions", pybind11::arg("start"), pybind11::arg("stop"))
 
 

@@ -89,6 +89,9 @@ struct AddTransactionMethods {
         func(method_tag, "is_wasabi2_coinjoin_with_input_count", +[](const Transaction &tx, uint64_t min_input_count) -> bool {
             return blocksci::heuristics::isWasabi2CoinJoin(tx, std::optional<uint64_t>{min_input_count});
         }, "Return's true if this transaction is a CoinJoin transaction with given `min_input_count`", pybind11::arg("min_input_count") = 50); 
+        func(property_tag, "mempool_space_link", +[](const Transaction &tx) -> std::string {
+            return "https://mempool.space/tx/" + tx.getHash().GetHex();
+        }, "A link to the mempool.space page for this transaction");
     }
 };
 
