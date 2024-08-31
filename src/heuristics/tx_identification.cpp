@@ -862,18 +862,39 @@ namespace heuristics {
         return std::count_if(tx.inputs().begin(), tx.inputs().end(), [current_pool_size](const Input& input) {
             return input.getValue() != current_pool_size && input.getValue() > current_pool_size && (input.getValue() - current_pool_size) < 110000;
         });
+    }
 
+    ConsolidationType getConsolidationType(const Transaction &tx, double inputOutputRatio) {
+        if (tx.inputCount() != 1 && tx.outputCount() == 1) {
+            return ConsolidationType::Certain;
+        }
 
-        // var poolSizedInputCount = tx.Inputs.Count(x => x.PrevOutput.Value == poolSize);
-        // isSamouraiCj =
-        //    isNativeSegwitOnly
-        //    && inputCount >= 5 && inputCount <= 10
-        //    && outputCount >= 5 && outputCount <= 10
-        //    && inputCount == outputCount
-        //    && outputValues.Distinct().Count() == 1 // Outputs are always equal.
-        //    && Constants.SamouraiPools.Any(x => x == poolSize) // Just to be sure match Samourai's pool sizes.
-        //    && poolSizedInputCount >= 1
-        //    && tx.Inputs.Where(x => x.PrevOutput.Value != poolSize).All(x => x.PrevOutput.Value.Almost(poolSize, Money.Coins(0.0011m)));
+        auto total_output_value = std::accumulate(tx.outputs().begin(), tx.outputs().end(), 0, [](int64_t sum, const Output& output) {
+            return sum + output.getValue();
+        });
+
+        // Check if there is one huge output that has the majority of the output value, while the rest are small, it's a consolidation
+        if (tx.outputCount() > 1 && tx.outputCount() < (tx.inputCount() * inputOutputRatio)) {
+            
+            // Check if any input is larger than half of the total output value
+            if (std::any_of(tx.inputs().begin(), tx.inputs().end(), [total_output_value](const Input& input) {
+                return input.getValue() > total_output_value * 0.5;
+            })) {
+                return ConsolidationType::None;
+            }
+
+            // Determine the maximum output value
+            auto max_output_value = std::max_element(tx.outputs().begin(), tx.outputs().end(), [](const Output& a, const Output& b) {
+                return a.getValue() < b.getValue();
+            });
+
+            // If the largest output is more than 90% of the total output value, it's a possible consolidation
+            if ((*max_output_value).getValue() > total_output_value * 0.9) {
+                return ConsolidationType::Possible;
+            }
+        }
+
+        return ConsolidationType::None;
 
     }
 }}
