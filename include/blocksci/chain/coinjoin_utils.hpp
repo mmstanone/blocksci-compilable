@@ -136,11 +136,11 @@ namespace blocksci {
             return denominations; 
         }
 
-        static inline std::vector<std::string> compute_ww2_coord_scripts() {
+        static inline std::vector<std::string> compute_ww1_coord_scripts() {
             return {"bc1qs604c7jv6amk4cxqlnvuxv26hv3e48cds4m0ew", "bc1qa24tsgchvuxsaccp8vrnkfd85hrcpafg20kmjw"};
         }
     public:
-        static inline std::vector<std::string> ww2_coord_scripts = CoinjoinUtils::compute_ww2_coord_scripts();
+        static inline std::vector<std::string> ww1_coord_scripts = CoinjoinUtils::compute_ww1_coord_scripts();
         static inline std::unordered_set<long> ww2_denominations = CoinjoinUtils::compute_ww2_denominations();
 
         CoinjoinUtils() = default;

@@ -50,63 +50,6 @@ namespace heuristics {
         return false;
     }
 
-
-
-    /**
-     * Check if a transaction looks like a Wasabi2 CoinJoin transaction.
-     * Ported from Dumplings
-    */
-    bool isWasabi2CoinJoin(const Transaction &tx, std::optional<uint64_t> inputCount) {
-        // first ww2 coinjoin block
-        if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstWasabi2Block) {
-            return false;
-        }
-        for (const auto &input : tx.inputs()) {
-            if (input.getType() != AddressType::Enum::WITNESS_PUBKEYHASH && input.getType() != AddressType::Enum::WITNESS_UNKNOWN) {
-                return false;
-            }
-        }
-        for (const auto &output : tx.outputs()) {
-            if (output.getType() != AddressType::Enum::WITNESS_PUBKEYHASH && output.getType() != AddressType::Enum::WITNESS_UNKNOWN) {
-                return false;
-            }
-        }
-
-        if ((inputCount.has_value() && tx.inputCount() != inputCount) || (!inputCount.has_value() && tx.inputCount() < 50)) {
-            return false;
-        }
-
-        // Inputs are ordered descending.
-        long long prev_input_value = -1;
-        for (const auto &input : tx.inputs()) {
-            
-            if (prev_input_value != -1 && input.getValue() > prev_input_value) {
-                return false;
-            }
-
-            prev_input_value = input.getValue();
-        }
-
-        // Outputs are ordered descending.
-        long long prev_output_value = -1;
-        for (const auto &output : tx.outputs()) {
-            if (prev_output_value != -1 && output.getValue() > prev_output_value) {
-                return false;
-            }
-
-            prev_output_value = output.getValue();
-        }
-
-        // Most of the outputs contains the denomination.
-        int count = 0;
-        for (const auto &output : tx.outputs()) {
-            if (CoinjoinUtils::ww2_denominations.find(output.getValue()) != CoinjoinUtils::ww2_denominations.end()) {
-                count++;
-            }
-        }
-
-        return count > tx.outputCount() * 0.8;
-    }
     
     bool isCoinjoin(const Transaction &tx) {
         if (tx.inputCount() < 2 || tx.outputCount() < 3) {
@@ -721,11 +664,153 @@ namespace heuristics {
             return false;
         }
 
+        // before FirstWasabiNoCoordAddressBlock WW1 had different base denominations and fixed coordinators
+        if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstWasabiNoCoordAddressBlock) {
+            // at least one output has to be a coord output
+            auto is_coord_output = std::any_of(tx.outputs().begin(), tx.outputs().end(), [](const Output& output) {
+
+                return output.isSpent() 
+                    && std::find(
+                        blocksci::CoinjoinUtils::ww1_coord_scripts.begin(), 
+                        blocksci::CoinjoinUtils::ww1_coord_scripts.end(), 
+                        output.getAddress().getScript().toPrettyString()
+                    ) != blocksci::CoinjoinUtils::ww1_coord_scripts.end();
+            });
+
+            // get output values and their count
+            std::unordered_map<int64_t, int> outputValues;
+            RANGES_FOR(auto output, tx.outputs()) {
+                outputValues[output.getValue()]++;
+            }
+            // check if there are at least 2 outputs with the same value
+            auto pr = std::max_element(
+                std::begin(outputValues), std::end(outputValues),
+                    [] (const std::pair<int64_t, int> & p1, const std::pair<int64_t, int> & p2) {
+                        return p1.second < p2.second;
+                    }
+            );
+
+            return is_coord_output && pr->second > 2;
+        }
+
+        // after FirstWasabiNoCoordAddressBlock WW1 had fixed base denomination and no coordinators
+        
+        // if all outputs are native segwit only
+        auto isNativeSegwitOnly = std::all_of(tx.outputs().begin(), tx.outputs().end(), [](const Output& output) {
+            return output.getAddress().type == AddressType::Enum::WITNESS_PUBKEYHASH;
+        });
+        if (!isNativeSegwitOnly) {
+            return false;
+        }
+
+        // and there are at least 10 equal outputs
+        std::unordered_map<int64_t, int> outputValues;
+        RANGES_FOR(auto output, tx.outputs()) {
+            outputValues[output.getValue()]++;
+        }
+        auto mostFrequentEqualOutputCount = std::max_element(
+            std::begin(outputValues), std::end(outputValues),
+                [] (const std::pair<int64_t, int> & p1, const std::pair<int64_t, int> & p2) {
+                    return p1.second < p2.second;
+                }
+        );
+        if (mostFrequentEqualOutputCount->second < 10) {
+            return false;
+        }
+
+        // and there are more inputs than most frequent equal outputs
+        if (tx.inputCount() < mostFrequentEqualOutputCount->second) {
+            return false;
+        } 
+
+        // and the most frequent equal output is almost the base denomination 0.1 BTC +- 0.02 BTC
+
+        if (mostFrequentEqualOutputCount->first < 0.08 * 1e8 || mostFrequentEqualOutputCount->first > 0.12 * 1e8) {
+            return false;
+        }
+
+        // and there are at least 2 unique outputs - mostFrequentEqualOutputCount size >= 2
+        if (outputValues.size() < 2) {
+            return false;
+        }
+
+        // if (block.Height < Constants.FirstWasabiNoCoordAddressBlock)
+        // {
+        //     isWasabiCj = tx.Outputs.Any(x => Constants.WasabiCoordScripts.Contains(x.ScriptPubKey)) && indistinguishableOutputs.Any(x => x.count > 2);
+        // }
+
+
+        // var uniqueOutputCount = tx.GetIndistinguishableOutputs(includeSingle: true).Count(x => x.count == 1);
+        // isWasabiCj =            
+        //             isNativeSegwitOnly
+        //             && mostFrequentEqualOutputCount >= 10 // At least 10 equal outputs.
+        //             && inputCount >= mostFrequentEqualOutputCount // More inptuts than most frequent equal outputs.
+        //             && mostFrequentEqualOutputValue.Almost(Constants.ApproximateWasabiBaseDenomination, Constants.WasabiBaseDenominationPrecision) // The most frequent equal outputs must be almost the base denomination.
+        //             && uniqueOutputCount >= 2; // It's very likely there's at least one change and at least one coord output those have unique values.
+        //     }
+        
         if (blocksci::heuristics::isWasabi2CoinJoin(tx)) {
             return false;
         }
+
         return true;
 
+    }
+
+     /**
+     * Check if a transaction looks like a Wasabi2 CoinJoin transaction.
+     * Ported from Dumplings
+    */
+    bool isWasabi2CoinJoin(const Transaction &tx, std::optional<uint64_t> inputCount) {
+        // first ww2 coinjoin block
+        if (tx.getBlockHeight() < blocksci::CoinjoinUtils::FirstWasabi2Block) {
+            return false;
+        }
+        for (const auto &input : tx.inputs()) {
+            if (input.getType() != AddressType::Enum::WITNESS_PUBKEYHASH && input.getType() != AddressType::Enum::WITNESS_UNKNOWN) {
+                return false;
+            }
+        }
+        for (const auto &output : tx.outputs()) {
+            if (output.getType() != AddressType::Enum::WITNESS_PUBKEYHASH && output.getType() != AddressType::Enum::WITNESS_UNKNOWN) {
+                return false;
+            }
+        }
+
+        if ((inputCount.has_value() && tx.inputCount() != inputCount) || (!inputCount.has_value() && tx.inputCount() < 50)) {
+            return false;
+        }
+
+        // Inputs are ordered descending.
+        long long prev_input_value = -1;
+        for (const auto &input : tx.inputs()) {
+            
+            if (prev_input_value != -1 && input.getValue() > prev_input_value) {
+                return false;
+            }
+
+            prev_input_value = input.getValue();
+        }
+
+        // Outputs are ordered descending.
+        long long prev_output_value = -1;
+        for (const auto &output : tx.outputs()) {
+            if (prev_output_value != -1 && output.getValue() > prev_output_value) {
+                return false;
+            }
+
+            prev_output_value = output.getValue();
+        }
+
+        // Most of the outputs contains the denomination.
+        int count = 0;
+        for (const auto &output : tx.outputs()) {
+            if (CoinjoinUtils::ww2_denominations.find(output.getValue()) != CoinjoinUtils::ww2_denominations.end()) {
+                count++;
+            }
+        }
+
+        return count > tx.outputCount() * 0.8;
     }
 
     bool isWhirlpoolCoinJoin(const Transaction &tx) {

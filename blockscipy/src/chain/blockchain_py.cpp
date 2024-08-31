@@ -173,6 +173,17 @@ void init_blockchain(py::class_<Blockchain> &cl) {
         return chain[{start, stop}].mapReduce<MapType, decltype(map_func), decltype(reduce_func)>(map_func, reduce_func);
     }, "Filter the blockchain to only include 'friends don't pay' transactions.", pybind11::arg("keys"), pybind11::arg("start"), pybind11::arg("stop"))
 
+    .def("filter_coinjoin_txes", [](Blockchain &chain, BlockHeight start, BlockHeight stop, std::string coinjoin_type) {
+        return chain[{start, stop}].filter([&](const Transaction &tx) {
+            auto is_coinjoin_type = [&](const Transaction &tx, const std::string &coinjoinType) {
+                if (coinjoinType == "ww2") return blocksci::heuristics::isWasabi2CoinJoin(tx);
+                if (coinjoinType == "ww1") return blocksci::heuristics::isWasabi1CoinJoin(tx);
+                if (coinjoinType == "wp") return blocksci::heuristics::isWhirlpoolCoinJoin(tx);
+                return false;
+            };
+            return is_coinjoin_type(tx, coinjoin_type);
+        });
+    }, "Filter ww1 coinjoin transactions", pybind11::arg("start"), pybind11::arg("stop"), pybind11::arg("coinjoin_type"))
     .def("filter_ww2_coinjoin_txes", [](Blockchain &chain, BlockHeight start, BlockHeight stop) {
         return chain[{start, stop}].filter([](const Transaction &tx) {
             return blocksci::heuristics::isWasabi2CoinJoin(tx);

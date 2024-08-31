@@ -11,16 +11,20 @@ RUN apt-get install -y cmake libtool autoconf libboost-filesystem-dev \
     libboost-test-dev libssl-dev libjsoncpp-dev libcurl4-openssl-dev \
     libjsoncpp-dev libjsonrpccpp-dev libsnappy-dev zlib1g-dev libbz2-dev \
     liblz4-dev libzstd-dev libjemalloc-dev libsparsehash-dev python3-dev \
-    python3-pip pkg-config git g++-7 gcc-7 ffmpeg libcairo2 libcairo2-dev
+    python3-pip pkg-config git g++-7 gcc-7 ffmpeg libcairo2 libcairo2-dev curl
 
 
 ADD . /blocksci-compilable
 
 # Clone BlockSci repository
 # RUN git clone https://github.com/mmstanone/blocksci-compilable.git
-RUN CC=gcc-7 CXX=g++ pip install -r /blocksci-compilable/pip-all-requirements.txt
 
-# RUN cd blocksci-compilable && ./build.sh
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN source $HOME/.cargo/env
+
+RUN uv venv
+
+RUN CC=gcc-7 CXX=g++ uv run pip install -r /blocksci-compilable/pip-all-requirements.txt
 
 # Build BlockSci
 RUN cd blocksci-compilable && \
@@ -34,7 +38,7 @@ RUN cd blocksci-compilable && \
 
 # Install BlockSci Python bindings
 RUN cd blocksci-compilable && \
-    CC=gcc-7 CXX=g++-7 pip3 install -e blockscipy
+    uv run CC=gcc-7 CXX=g++-7 pip3 install -e blockscipy
 
 # Set the default command for the container
 CMD ["/bin/bash"]
