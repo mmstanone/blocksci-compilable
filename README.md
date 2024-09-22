@@ -1,10 +1,9 @@
-BlockSci
-~~~~~~~~~~~~~~~~~~
+# BlockSci
+
 This is a fork of the original BlockSci repository with extensions for the analysis of CoinJoin transactions.
 This fork is a part of the Master's thesis developed for CRoCS laboratory at Masaryk University, Brno, Czech Republic.
 
-Quickstart
-=====================
+## Quickstart
 This version of BlockSci is intended to be run in Docker. As of 2024, BlockSci runs on Python 3.7 with many outdated libraries. If you **really** want to run it on your machine, you can try to follow the installation
 instructions from the original repository, however, unless you are running Ubuntu 20.04, you will most likely encounter issues.
 
@@ -14,7 +13,7 @@ For the Python library, which is the main interface for the user, we set up Jupy
 To run BlockSci in Docker, the following steps are required:
 
 1. Clone this repository
-2. Install Docker_
+2. Install [Docker](https://docs.docker.com/get-docker/)
 3. Build the Docker image by running `docker build -t blocksci-cj .` in the root of the repository. This is just an initial setup to get all the libraries, and the *real* compilation will happen later.
     1. We use `uv` to speed up the `blockscipy` installation, since it takes a long time.
 
@@ -49,41 +48,18 @@ Now, as we have everything mounted and we are connected to the container, we can
     3. Now just wait for a while and everything should be parsed. We suggest for the **initial** run to have the blockchain directory on some fast read disk, as it takes a while.
 3. After everything smoothly parses, run `./build.sh` once again. Now, there should be a Jupyter notebook running at port `<notebook port>`.
 4. For smoother learning experience we suggest to read the docs below, as well as turning Hinterland on.
-    1. `Hinterland`_ is a jupyter extension that enables autocomplete in the notebook.
+    1. [Hinterland](https://jupyter-contrib-nbextensions.readthedocs.io/en/latest/nbextensions/hinterland/README.html) is a jupyter extension that enables autocomplete in the notebook.
 
-.. _Docker: https://docs.docker.com/get-docker/
-.. _Hinterland https://jupyter-contrib-nbextensions.readthedocs.io/en/latest/nbextensions/hinterland/README.html
+## Documentation from the original repository
 
-Documentation from the original repository
-=====================
+We provide instructions in our [online documentation](https://citp.github.io/BlockSci/):
 
-We provide instructions in our online documentation_:
+- [Installation instructions](https://citp.github.io/BlockSci/setup.html)
+- [Using BlockSci](https://citp.github.io/BlockSci/using-blocksci.html)
+- [Guide for the fluent interface](https://citp.github.io/BlockSci/fluent-interface.html)
+- [Module reference for the Python interface](https://citp.github.io/BlockSci/reference/reference.html)
+- [Troubleshooting](https://citp.github.io/BlockSci/troubleshooting.html)
 
-- `Installation instructions`_
-
-- `Using BlockSci`_
-
-- `Guide for the fluent interface`_
-
-- `Module reference for the Python interface`_
-
-- `Troubleshooting`_
-
-.. _documentation: https://citp.github.io/BlockSci/
-
-.. _Installation instructions: https://citp.github.io/BlockSci/setup.html
-
-.. _Guide for the fluent interface: https://citp.github.io/BlockSci/fluent-interface.html
-
-.. _Using BlockSci: https://citp.github.io/BlockSci/using-blocksci.html
-
-.. _Module reference for the Python interface: https://citp.github.io/BlockSci/reference/reference.html
-
-.. _Troubleshooting: https://citp.github.io/BlockSci/troubleshooting.html
-
-
-Our FAQ_ contains additional useful examples and tips.
-
-.. _FAQ: https://github.com/citp/BlockSci/wiki
+Our [FAQ](https://github.com/citp/BlockSci/wiki) contains additional useful examples and tips.
 
 
