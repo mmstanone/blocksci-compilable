@@ -20,21 +20,35 @@ ADD . /blocksci-compilable
 
 # Clone BlockSci repository
 # RUN git clone https://github.com/mmstanone/blocksci-compilable.git
-RUN CC=gcc-7 CXX=g++ pip install -r /blocksci-compilable/pip-all-requirements.txt
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN /root/.cargo/bin/uv python install 3.8.20
+RUN /root/.cargo/bin/uv python pin 3.8.20
+
+RUN /root/.cargo/bin/uv run which pip3
+
+RUN mkdir -p /usr/lib/python3.8/site-packages/
+
+RUN cd /blocksci-compilable && \
+    /root/.cargo/bin/uv venv && CC=gcc-7 CXX=g++ /root/.cargo/bin/uv run pip3 install -r /blocksci-compilable/pip-all-requirements.txt
 
 # Build BlockSci
 RUN cd blocksci-compilable && \
-    rm -r release && \
-    mkdir release && \
-    cd release && \
+    rm -rf build && \
+    mkdir build && \
+    cd build && \
     CC=gcc-7 CXX=g++-7 cmake -DCMAKE_BUILD_TYPE=Release .. && \
     make && \
     make install
 
 
 # Install BlockSci Python bindings
-RUN cd blocksci-compilable && \
-    CC=gcc-7 CXX=g++-7 pip3 install -e blockscipy
+RUN cd blocksci-compilable && rm -rf blockscipy/build && \
+    /root/.cargo/bin/uv venv && CC=gcc-7 CXX=g++-7 /root/.cargo/bin/uv run pip3 install -e blockscipy
+
+# remove the build folder for blockscipy, as we will rebuild again anyway
+
+RUN rm -rf /blocksci-compilable/blokscipy/build
 
 # Set the default command for the container
 CMD ["/bin/bash"]
