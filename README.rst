@@ -1,16 +1,60 @@
 BlockSci
 ~~~~~~~~~~~~~~~~~~
+This is a fork of the original BlockSci repository with extensions for the analysis of CoinJoin transactions.
+This fork is a part of the Master's thesis developed for CRoCS laboratory at Masaryk University, Brno, Czech Republic.
 
-**As of November 2020, we are no longer actively developing or supporting BlockSci.** Please be aware that as cryptocurrencies continue to evolve, they may lose compatibility with BlockSci and might break it in unexpected ways.
+Quickstart
+=====================
+This version of BlockSci is intended to be run in Docker. As of 2024, BlockSci runs on Python 3.7 with many outdated libraries. If you **really** want to run it on your machine, you can try to follow the installation
+instructions from the original repository, however, unless you are running Ubuntu 20.04, you will most likely encounter issues.
 
-The Bitcoin blockchain — currently 280 GB and growing — contains a massive amount of data that can give us insights into the Bitcoin ecosystem, including how users, businesses, and miners operate. BlockSci enables fast and expressive analysis of Bitcoin’s and many other blockchains. The accompanying paper explains its design and applications: https://www.usenix.org/system/files/sec20-kalodner.pdf.
+BlockSci is a high-performance tool for blockchain science and exploration. It consists of two main components: a C++ library that performs high-performance blockchain analysis, and a Python library to provide high-level access to the results.
+For the Python library, which is the main interface for the user, we set up Jupyter notebooks with examples of how to use BlockSci for various analyses.
 
-Current tools for blockchain analysis depend on general-purpose databases that provide "ACID" guarantees. But that’s unnecessary for blockchain analysis where the data structures are append-only. We take advantage of this observation in the design of our custom in-memory blockchain database as well as an analysis library. BlockSci’s core infrastructure is written in C++ and optimized for speed. (For example, traversing every transaction input and output on the Bitcoin blockchain takes only **1 second** on our r5.4xlarge EC2 machine.) To make analysis more convenient, we provide Python bindings and a Jupyter notebook interface.
+To run BlockSci in Docker, the following steps are required:
 
-*This repository contains research code that is no longer actively maintained, may contain bugs and errors and may break in unexpected ways. We are an academic team and aren’t able to provide the level of QA and support that you might expect from a commercial project.*
+1. Clone this repository
+2. Install Docker_
+3. Build the Docker image by running `docker build -t blocksci-cj .` in the root of the repository. This is just an initial setup to get all the libraries, and the *real* compilation will happen later.
+    1. We use `uv` to speed up the `blockscipy` installation, since it takes a long time.
 
+Now - since BlockSci is a memory-intensive and disk-consuming tool, we **strongly** recommend you to not hold the BlockSci data directly in the image, but to mount a persistent volume to the container.
 
-Documentation
+An example way to set up the mounts is as follows:
+
+- in `/mnt/blocksci` we mount this repository to be able to develop and write code without rebuilding the image.
+- in `/mnt/data` we mount the blockchain directory (e.g. `~/.bitcoin`). This folder is used just for the initial parsing and does not need to be a persistent volume, since it's just the full node folder.
+- in `/mnt/anal` we mount the volume where the BlockSci data will be stored. This is the most important volume, as it will contain the parsed blockchain data and the results of the analyses. Be careful as this volume can grow quite large.
+
+To run the container with the mounted volumes, you can use the following command:
+
+```bash
+docker run --name blocksci_container --replace -p <notebook port>:8888 -v <this repository folder>:/mnt/blocksci-compilable -v <bitcoin fullnode directory>:/mnt/data  -v <analysis volume>:/mnt/anal -it --entrypoint /bin/bash blocksci-cj:latest
+```
+
+The `--replace` flag is used to remove the container with the same name if it already exists. The `-p` flag is used to expose the Jupyter notebook on the specified port. The `-v` flag is used to mount the volumes. The `-it` flag is used to run the container in interactive mode. The `--entrypoint /bin/bash` flag is used to run the container in bash mode, so you can run the Jupyter notebook manually.
+
+Now, as we have everything mounted and we are connected to the container, we can run the "classic" BlockSci setup.
+
+1. First, `cd /mnt/blocksci`.
+2. Run `./build.sh`
+    1. This rebuilds the application with the correct development settings, correct filepaths etc.
+    2. This also runs the Notebooks, so when they are started, just turn them off, as we have no parsed data yet.
+2. Parse blockchain 
+    1. `blocksci_parser <config file> generate-config bitcoin <blocksci data directory> --disk <fullnode data directory>`
+        1. here, `<config file>` is a file that will be created, for example `/mnt/anal/blocksci_config.json`
+        2. `<blocksci data directory>` is `/mnt/anal/blocksci_data` if you follow our example with the mounted volume 
+        3. `<fullnode data directory>` is `/mnt/data`
+    2. That just creates the configuration. To actually parse the blockchain, run `blocksci_parser <config file> update` 
+    3. Now just wait for a while and everything should be parsed. We suggest for the **initial** run to have the blockchain directory on some fast read disk, as it takes a while.
+3. After everything smoothly parses, run `./build.sh` once again. Now, there should be a Jupyter notebook running at port `<notebook port>`.
+4. For smoother learning experience we suggest to read the docs below, as well as turning Hinterland on.
+    1. `Hinterland`_ is a jupyter extension that enables autocomplete in the notebook.
+
+.. _Docker: https://docs.docker.com/get-docker/
+.. _Hinterland https://jupyter-contrib-nbextensions.readthedocs.io/en/latest/nbextensions/hinterland/README.html
+
+Documentation from the original repository
 =====================
 
 We provide instructions in our online documentation_:
@@ -43,34 +87,3 @@ Our FAQ_ contains additional useful examples and tips.
 .. _FAQ: https://github.com/citp/BlockSci/wiki
 
 
-Latest release (BlockSci v0.7.0)
-================================
-
-Version 0.7.0 is based on the development branch v0.6, but requires a full reparse.
-
-Version 0.7.0 comes with a new `fluent Python interface`_ for fast and expressive blockchain queries. It contains a number of `important bug fixes`_ as well as many smaller improvements. We recommend upgrading to the latest version of BlockSci and no longer use v0.5.
-
-.. _important bug fixes: https://citp.github.io/BlockSci/changelog.html
-.. _fluent Python interface: https://citp.github.io/BlockSci/fluent-interface.html
-
-Amazon EC2 AMI
-==============================
-
-We no longer provide an AMI for BlockSci.
-
-
-Getting help
-============
-
-Please make sure to check the list of `Frequently Asked Questions`_ as well as the issue tracker first.
-If you've encountered a bug or have a question about using BlockSci not already answered, the best way to get help is to open a GitHub issue. We are an academic team and aren't able to provide the standard of support that you might expect for a commercial project.
-
-.. _Frequently Asked Questions: https://github.com/citp/BlockSci/wiki
-
-
-Team & contact info
-===================
-
-BlockSci was created by Harry Kalodner, Malte Möser, Kevin Lee, Steven Goldfeder, Martin Plattner, Alishah Chator, and Arvind Narayanan at Princeton University. It is supported by NSF grants CNS-1421689 and CNS-1651938, an NSF Graduate Research Fellowship under grant number DGE-1148900 and a grant from the Ripple University Blockchain Research Initiative. We've released a paper_ describing BlockSci's design and a few applications that illustrate its capabilities (an updated version of the paper has been accepted at Usenix Security and will be available soon). You can contact the team at blocksci@lists.cs.princeton.edu.
-
-.. _paper: https://arxiv.org/abs/1709.02489
