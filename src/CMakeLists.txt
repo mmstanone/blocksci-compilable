@@ -239,6 +239,7 @@ set(HEURISTICS_HEADERS
   ${BLOCKSCI_HEADER_PREFIX}/heuristics/change_address.hpp
   ${BLOCKSCI_HEADER_PREFIX}/heuristics/taint.hpp
   ${BLOCKSCI_HEADER_PREFIX}/heuristics/tx_identification.hpp
+  ${BLOCKSCI_HEADER_PREFIX}/heuristics/clustering_coinjoin.hpp
 )
 
 set(HEURISTICS_SOURCES
@@ -246,6 +247,7 @@ set(HEURISTICS_SOURCES
   ${BLOCKSCI_SOURCE_PREFIX}/heuristics/change_address.cpp
   ${BLOCKSCI_SOURCE_PREFIX}/heuristics/taint.cpp
   ${BLOCKSCI_SOURCE_PREFIX}/heuristics/tx_identification.cpp
+  ${BLOCKSCI_SOURCE_PREFIX}/heuristics/clustering_coinjoin.cpp
 )
 
 set_source_files_properties(${BLOCKSCI_SOURCE_PREFIX}/scripts/bitcoin_bech32.cpp PROPERTIES COMPILE_FLAGS -Wno-everything)
