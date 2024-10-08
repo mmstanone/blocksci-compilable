@@ -733,21 +733,6 @@ namespace heuristics {
         if (outputValues.size() < 2) {
             return false;
         }
-
-        // if (block.Height < Constants.FirstWasabiNoCoordAddressBlock)
-        // {
-        //     isWasabiCj = tx.Outputs.Any(x => Constants.WasabiCoordScripts.Contains(x.ScriptPubKey)) && indistinguishableOutputs.Any(x => x.count > 2);
-        // }
-
-
-        // var uniqueOutputCount = tx.GetIndistinguishableOutputs(includeSingle: true).Count(x => x.count == 1);
-        // isWasabiCj =            
-        //             isNativeSegwitOnly
-        //             && mostFrequentEqualOutputCount >= 10 // At least 10 equal outputs.
-        //             && inputCount >= mostFrequentEqualOutputCount // More inptuts than most frequent equal outputs.
-        //             && mostFrequentEqualOutputValue.Almost(Constants.ApproximateWasabiBaseDenomination, Constants.WasabiBaseDenominationPrecision) // The most frequent equal outputs must be almost the base denomination.
-        //             && uniqueOutputCount >= 2; // It's very likely there's at least one change and at least one coord output those have unique values.
-        //     }
         
         if (blocksci::heuristics::isWasabi2CoinJoin(tx)) {
             return false;
@@ -895,6 +880,19 @@ namespace heuristics {
         }
 
         return ConsolidationType::None;
-
     }
-}}
+
+    bool isCoinjoinOfGivenType(const Transaction &tx, const std::string &type) {
+        if (type == "wasabi1") {
+            return isWasabi1CoinJoin(tx);
+        } else if (type == "wasabi2") {
+            return isWasabi2CoinJoin(tx);
+        } else if (type == "whirlpool") {
+            return isWhirlpoolCoinJoin(tx);
+        } else {
+            return false;
+        }
+    }
+} // namespace heuristics
+} // namespace blocksci
+

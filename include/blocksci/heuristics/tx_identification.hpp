@@ -12,6 +12,7 @@
 #include <blocksci/chain/chain_fwd.hpp>
 #include <blocksci/scripts/scripts_fwd.hpp>
 #include <optional>
+#include <string>
 
 namespace blocksci {
     class DataAccess;
@@ -40,12 +41,13 @@ namespace blocksci {
     bool BLOCKSCI_EXPORT isWasabi1CoinJoin(const Transaction &tx);
     bool BLOCKSCI_EXPORT isWhirlpoolCoinJoin(const Transaction &tx);
 
+    bool BLOCKSCI_EXPORT isCoinjoinOfGivenType(const Transaction &tx, const std::string &type);
+
     HWWalletRemixResult BLOCKSCI_EXPORT isLongDormantInRemixes(const Transaction &tx);
 
     // consolidation
 
     ConsolidationType BLOCKSCI_EXPORT getConsolidationType(const Transaction &tx, double inputOutputRatio = 2);
-}}
-
+}} // namespace blocksci
 
 #endif /* tx_identification_hpp */
