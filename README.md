@@ -1,7 +1,7 @@
 # BlockSci
 
 This is a fork of the original BlockSci repository with extensions for the analysis of CoinJoin transactions.
-This fork is a part of the Master's thesis developed for CRoCS laboratory at Masaryk University, Brno, Czech Republic.
+This fork is a part of the [Master's thesis](https://is.muni.cz/th/qrvgf/Thesis.pdf) developed for CRoCS laboratory at Masaryk University, Brno, Czech Republic and use for [ESORICS'25 publication](https://crocs.fi.muni.cz/public/papers/coinjoins_esorics25).
 
 ## Quickstart
 This version of BlockSci is intended to be run in Docker. As of 2024, BlockSci runs on Python 3.7 with many outdated libraries. If you **really** want to run it on your machine, you can try to follow the installation
